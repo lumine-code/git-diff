@@ -18,7 +18,7 @@ To install `git-diff` search for _git-diff_ in the Install pane of the Lumine se
 
 ## Commands
 
-Commands available in `atom-text-editor`:
+Commands available in `atom-workspace`:
 
 - `git-diff:move-to-next-diff`: move the cursor to the next diff,
 - `git-diff:move-to-previous-diff`: move the cursor to the previous diff,
