@@ -1,5 +1,9 @@
 {
-  "atom-text-editor": {
+  // Part of the `alt-g` family, shared with git-panel, github-panel,
+  // open-repository and git-command. :not([mini]) because these act on the
+  // file: reached from a find field they would step through the diffs of the
+  // editor behind it.
+  "atom-text-editor:not([mini])": {
     "alt-g down": "git-diff:move-to-next-diff",
     "alt-g up": "git-diff:move-to-previous-diff",
     "alt-g d": "git-diff:toggle-diff-list"
