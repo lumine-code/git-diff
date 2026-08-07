@@ -66,6 +66,12 @@ describe("GitDiff package", () => {
       waitsForPromise(async () => {
         repository = await atom.repositories.resolveForPath(path.join(projectPath, "sample.js"));
       });
+      // The file's status is one of the inputs a recomputation is skipped on,
+      // and it arrives from the git worker. Recording a diff before the snapshot
+      // lands leaves the view holding the status of a file git has not described
+      // yet, so the next repository event sees an input that genuinely changed
+      // and recomputes — correctly, but not what this spec is about.
+      waitsForPromise(() => repository.ensureStatusSnapshot());
       runs(() => {
         expect(repository).toBeTruthy();
         spyOn(repository, "getLineDiffsAsync").andCallThrough();
