@@ -203,6 +203,42 @@ describe("GitDiff package", () => {
     });
   });
 
+  describe("when an ignored file is opened", () => {
+    // Git reports "ignored" as its own state, not as "untracked", so the
+    // untracked early-out never covered it. The path here also carries a glob
+    // metacharacter, which `git show <rev>:<path>` used to answer with HEAD's
+    // commit message at exit 0 rather than reporting the path as absent —
+    // between them, every line of an ignored file showed as changed.
+    it("leaves the editor unmarked", () => {
+      let repository, ignoredEditor;
+      const ignoredPath = path.join(projectPath, "[e] dir", "out.log");
+
+      fs.writeFileSync(path.join(projectPath, ".gitignore"), "*.log\n");
+      fs.mkdirSync(path.join(projectPath, "[e] dir"));
+      fs.writeFileSync(ignoredPath, "one\ntwo\nthree\n");
+
+      waitsForPromise(async () => {
+        repository = await atom.repositories.resolveForPath(ignoredPath);
+        await repository.refreshStatusSnapshot();
+        ignoredEditor = await atom.workspace.open(ignoredPath);
+      });
+
+      waitsForPromise(async () => {
+        expect(repository.getStatusEntry(ignoredPath).ignored).toBe(true);
+        // Absent at HEAD however the path is spelled.
+        expect(await repository.getFileAtRevision(ignoredPath, "HEAD")).toBeNull();
+      });
+
+      runs(() => {
+        spyOn(repository, "getLineDiffsAsync").andCallThrough();
+        ignoredEditor.insertText("a");
+        advanceClock(ignoredEditor.getBuffer().stoppedChangingDelay);
+        expect(repository.getLineDiffsAsync).not.toHaveBeenCalled();
+        expect(ignoredEditor.getMarkers().length).toBe(0);
+      });
+    });
+  });
+
   describe("when the project paths change", () => {
     it("doesn't try to use the destroyed git repository", () => {
       editor.deleteLine();
