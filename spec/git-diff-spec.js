@@ -1,9 +1,7 @@
 const path = require("path");
 const fs = require("@lumine-code/fs-plus");
 const temp = require("@lumine-code/temp").track();
-const { stopAllWatchers } = require(
-  path.join(atom.getLoadSettings().resourcePath, "src", "path-watcher"),
-);
+const { stopAllWatchers } = require(path.join(atom.app.getResourcePath(), "src", "path-watcher"));
 
 describe("GitDiff package", () => {
   let editor, editorElement, projectPath, screenUpdates;
