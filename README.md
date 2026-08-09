@@ -18,7 +18,7 @@ To install `git-diff` search for _git-diff_ in the Install pane of the Lumine se
 
 ## Commands
 
-Commands available in `atom-workspace`:
+Commands available in `lumine-workspace`:
 
 - `git-diff:move-to-next-diff`: move the cursor to the next diff,
 - `git-diff:move-to-previous-diff`: move the cursor to the previous diff,
@@ -29,7 +29,7 @@ Commands available in `atom-workspace`:
 Give added-line numbers a custom color by adding CSS to your `styles.css`:
 
 ```css
-atom-text-editor .gutter .line-number.git-line-added {
+lumine-text-editor .gutter .line-number.git-line-added {
   color: #98c379;
 }
 ```

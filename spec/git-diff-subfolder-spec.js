@@ -1,7 +1,7 @@
 const path = require("path");
 const fs = require("@lumine-code/fs-plus");
 const temp = require("@lumine-code/temp").track();
-const { stopAllWatchers } = require(path.join(atom.app.getResourcePath(), "src", "path-watcher"));
+const { stopAllWatchers } = require(path.join(lumine.app.getResourcePath(), "src", "path-watcher"));
 
 describe("GitDiff when targeting nested repository", () => {
   let editor, editorElement, projectPath;
@@ -24,18 +24,18 @@ describe("GitDiff when targeting nested repository", () => {
     fs.copySync(path.join(__dirname, "fixtures", "working-dir"), nestedPath);
     fs.moveSync(path.join(nestedPath, "git.git"), path.join(nestedPath, ".git"));
 
-    atom.project.setPaths([projectPath]);
+    lumine.project.setPaths([projectPath]);
 
-    jasmine.attachToDOM(atom.workspace.getElement());
+    jasmine.attachToDOM(lumine.workspace.getElement());
 
     waitsForPromise(async () => {
-      await atom.workspace.open(path.join(nestedPath, "sample.js"));
-      await atom.packages.activatePackage("git-diff");
+      await lumine.workspace.open(path.join(nestedPath, "sample.js"));
+      await lumine.packages.activatePackage("git-diff");
     });
 
     runs(() => {
-      editor = atom.workspace.getActiveTextEditor();
-      editorElement = atom.views.getView(editor);
+      editor = lumine.workspace.getActiveTextEditor();
+      editorElement = lumine.views.getView(editor);
     });
   });
 
@@ -47,7 +47,9 @@ describe("GitDiff when targeting nested repository", () => {
       // stopped), release every native watcher, and only then delete the
       // temp roots.
       await Promise.allSettled(
-        atom.project.getPaths().map((projectPath) => atom.project.getWatcherPromise(projectPath)),
+        lumine.project
+          .getPaths()
+          .map((projectPath) => lumine.project.getWatcherPromise(projectPath)),
       );
       await stopAllWatchers();
       temp.cleanup();

@@ -9,19 +9,19 @@ describe("git-diff:toggle-diff-list", () => {
     const projectPath = temp.mkdirSync("git-diff-spec-");
     fs.copySync(path.join(__dirname, "fixtures", "working-dir"), projectPath);
     fs.moveSync(path.join(projectPath, "git.git"), path.join(projectPath, ".git"));
-    atom.project.setPaths([projectPath]);
+    lumine.project.setPaths([projectPath]);
 
-    jasmine.attachToDOM(atom.workspace.getElement());
+    jasmine.attachToDOM(lumine.workspace.getElement());
 
-    waitsForPromise(() => atom.packages.activatePackage("git-diff"));
+    waitsForPromise(() => lumine.packages.activatePackage("git-diff"));
 
-    waitsForPromise(() => atom.workspace.open("sample.js"));
+    waitsForPromise(() => lumine.workspace.open("sample.js"));
 
     runs(() => {
-      editor = atom.workspace.getActiveTextEditor();
+      editor = lumine.workspace.getActiveTextEditor();
       editor.setCursorBufferPosition([8, 30]);
       editor.insertText("a");
-      atom.commands.dispatch(editor.getElement(), "git-diff:toggle-diff-list");
+      lumine.commands.dispatch(editor.getElement(), "git-diff:toggle-diff-list");
     });
 
     waitsFor(() => {
@@ -37,7 +37,7 @@ describe("git-diff:toggle-diff-list", () => {
 
   it("moves the cursor to the selected hunk", () => {
     editor.setCursorBufferPosition([0, 0]);
-    atom.commands.dispatch(document.querySelector(".diff-list-view"), "core:confirm");
+    lumine.commands.dispatch(document.querySelector(".diff-list-view"), "core:confirm");
     expect(editor.getCursorBufferPosition()).toEqual([8, 4]);
   });
 });

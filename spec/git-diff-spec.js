@@ -1,7 +1,7 @@
 const path = require("path");
 const fs = require("@lumine-code/fs-plus");
 const temp = require("@lumine-code/temp").track();
-const { stopAllWatchers } = require(path.join(atom.app.getResourcePath(), "src", "path-watcher"));
+const { stopAllWatchers } = require(path.join(lumine.app.getResourcePath(), "src", "path-watcher"));
 
 describe("GitDiff package", () => {
   let editor, editorElement, projectPath, screenUpdates;
@@ -19,18 +19,18 @@ describe("GitDiff package", () => {
 
     fs.copySync(path.join(__dirname, "fixtures", "working-dir"), projectPath);
     fs.moveSync(path.join(projectPath, "git.git"), path.join(projectPath, ".git"));
-    atom.project.setPaths([otherPath, projectPath]);
+    lumine.project.setPaths([otherPath, projectPath]);
 
-    jasmine.attachToDOM(atom.workspace.getElement());
+    jasmine.attachToDOM(lumine.workspace.getElement());
 
     waitsForPromise(async () => {
-      await atom.workspace.open(path.join(projectPath, "sample.js"));
-      await atom.packages.activatePackage("git-diff");
+      await lumine.workspace.open(path.join(projectPath, "sample.js"));
+      await lumine.packages.activatePackage("git-diff");
     });
 
     runs(() => {
-      editor = atom.workspace.getActiveTextEditor();
-      editorElement = atom.views.getView(editor);
+      editor = lumine.workspace.getActiveTextEditor();
+      editorElement = lumine.views.getView(editor);
     });
   });
 
@@ -42,7 +42,9 @@ describe("GitDiff package", () => {
       // stopped), release every native watcher, and only then delete the
       // temp roots.
       await Promise.allSettled(
-        atom.project.getPaths().map((projectPath) => atom.project.getWatcherPromise(projectPath)),
+        lumine.project
+          .getPaths()
+          .map((projectPath) => lumine.project.getWatcherPromise(projectPath)),
       );
       await stopAllWatchers();
       temp.cleanup();
@@ -62,7 +64,7 @@ describe("GitDiff package", () => {
 
       waitsFor(() => screenUpdates > 0);
       waitsForPromise(async () => {
-        repository = await atom.repositories.resolveForPath(path.join(projectPath, "sample.js"));
+        repository = await lumine.repositories.resolveForPath(path.join(projectPath, "sample.js"));
       });
       // The file's status is one of the inputs a recomputation is skipped on,
       // and it arrives from the git worker. Recording a diff before the snapshot
@@ -185,10 +187,10 @@ describe("GitDiff package", () => {
     it("highlights the changed lines", () => {
       fs.writeFileSync(path.join(projectPath, "sample.txt"), "Some different text.");
 
-      waitsForPromise(() => atom.workspace.open(path.join(projectPath, "sample.txt")));
+      waitsForPromise(() => lumine.workspace.open(path.join(projectPath, "sample.txt")));
 
       runs(() => {
-        editor = atom.workspace.getActiveTextEditor();
+        editor = lumine.workspace.getActiveTextEditor();
         editorElement = editor.getElement();
       });
 
@@ -216,9 +218,9 @@ describe("GitDiff package", () => {
       fs.writeFileSync(ignoredPath, "one\ntwo\nthree\n");
 
       waitsForPromise(async () => {
-        repository = await atom.repositories.resolveForPath(ignoredPath);
+        repository = await lumine.repositories.resolveForPath(ignoredPath);
         await repository.refreshStatusSnapshot();
-        ignoredEditor = await atom.workspace.open(ignoredPath);
+        ignoredEditor = await lumine.workspace.open(ignoredPath);
       });
 
       waitsForPromise(async () => {
@@ -240,7 +242,7 @@ describe("GitDiff package", () => {
   describe("when the project paths change", () => {
     it("doesn't try to use the destroyed git repository", () => {
       editor.deleteLine();
-      atom.project.setPaths([temp.mkdirSync("no-repository")]);
+      lumine.project.setPaths([temp.mkdirSync("no-repository")]);
       advanceClock(editor.getBuffer().stoppedChangingDelay);
       waitsFor(() => editor.getMarkers().length === 0);
       runs(() => {
@@ -261,10 +263,10 @@ describe("GitDiff package", () => {
       waitsFor(() => editorElement.querySelectorAll(".git-line-removed").length > 0);
       runs(() => {
         editor.setCursorBufferPosition([0]);
-        atom.commands.dispatch(editorElement, "git-diff:move-to-next-diff");
+        lumine.commands.dispatch(editorElement, "git-diff:move-to-next-diff");
         expect(editor.getCursorBufferPosition()).toEqual([4, 4]);
 
-        atom.commands.dispatch(editorElement, "git-diff:move-to-previous-diff");
+        lumine.commands.dispatch(editorElement, "git-diff:move-to-previous-diff");
         expect(editor.getCursorBufferPosition()).toEqual([0, 0]);
       });
     });
@@ -278,19 +280,19 @@ describe("GitDiff package", () => {
       waitsFor(() => editorElement.querySelectorAll(".git-line-removed").length > 0);
       runs(() => {
         editor.setCursorBufferPosition([0]);
-        atom.commands.dispatch(editorElement, "git-diff:move-to-next-diff");
+        lumine.commands.dispatch(editorElement, "git-diff:move-to-next-diff");
         expect(editor.getCursorBufferPosition().toArray()).toEqual([4, 4]);
 
-        atom.commands.dispatch(editorElement, "git-diff:move-to-next-diff");
+        lumine.commands.dispatch(editorElement, "git-diff:move-to-next-diff");
         expect(editor.getCursorBufferPosition().toArray()).toEqual([0, 0]);
 
-        atom.commands.dispatch(editorElement, "git-diff:move-to-previous-diff");
+        lumine.commands.dispatch(editorElement, "git-diff:move-to-previous-diff");
         expect(editor.getCursorBufferPosition().toArray()).toEqual([4, 4]);
       });
     });
 
     describe("when the wrapAroundOnMoveToDiff config option is false", () => {
-      beforeEach(() => atom.config.set("git-diff.wrapAroundOnMoveToDiff", false));
+      beforeEach(() => lumine.config.set("git-diff.wrapAroundOnMoveToDiff", false));
 
       it("does not wraps around to the first/last diff in the file", () => {
         editor.insertText("a");
@@ -301,16 +303,16 @@ describe("GitDiff package", () => {
 
         runs(() => {
           editor.setCursorBufferPosition([0]);
-          atom.commands.dispatch(editorElement, "git-diff:move-to-next-diff");
+          lumine.commands.dispatch(editorElement, "git-diff:move-to-next-diff");
           expect(editor.getCursorBufferPosition()).toEqual([4, 4]);
 
-          atom.commands.dispatch(editorElement, "git-diff:move-to-next-diff");
+          lumine.commands.dispatch(editorElement, "git-diff:move-to-next-diff");
           expect(editor.getCursorBufferPosition()).toEqual([4, 4]);
 
-          atom.commands.dispatch(editorElement, "git-diff:move-to-previous-diff");
+          lumine.commands.dispatch(editorElement, "git-diff:move-to-previous-diff");
           expect(editor.getCursorBufferPosition()).toEqual([0, 0]);
 
-          atom.commands.dispatch(editorElement, "git-diff:move-to-previous-diff");
+          lumine.commands.dispatch(editorElement, "git-diff:move-to-previous-diff");
           expect(editor.getCursorBufferPosition()).toEqual([0, 0]);
         });
       });
@@ -319,7 +321,7 @@ describe("GitDiff package", () => {
 
   describe("when the showIconsInEditorGutter config option is true", () => {
     beforeEach(() => {
-      atom.config.set("git-diff.showIconsInEditorGutter", true);
+      lumine.config.set("git-diff.showIconsInEditorGutter", true);
     });
 
     it("the gutter has a git-diff-icon class", () => {
@@ -333,10 +335,10 @@ describe("GitDiff package", () => {
       waitsFor(() => screenUpdates > 0);
 
       runs(() => {
-        atom.config.set("editor.showLineNumbers", false);
+        lumine.config.set("editor.showLineNumbers", false);
         expect(editorElement.querySelector(".gutter")).not.toHaveClass("git-diff-icon");
 
-        atom.config.set("editor.showLineNumbers", true);
+        lumine.config.set("editor.showLineNumbers", true);
         expect(editorElement.querySelector(".gutter")).toHaveClass("git-diff-icon");
       });
     });
@@ -345,7 +347,7 @@ describe("GitDiff package", () => {
       waitsFor(() => screenUpdates > 0);
 
       runs(() => {
-        atom.config.set("git-diff.showIconsInEditorGutter", false);
+        lumine.config.set("git-diff.showIconsInEditorGutter", false);
         expect(editorElement.querySelector(".gutter")).not.toHaveClass("git-diff-icon");
       });
     });
