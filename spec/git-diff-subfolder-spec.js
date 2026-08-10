@@ -6,11 +6,11 @@ const { stopAllWatchers } = require(path.join(lumine.app.getResourcePath(), "src
 describe("GitDiff when targeting nested repository", () => {
   let editor, editorElement, projectPath;
 
-  beforeEach(() => {
-    spyOn(window, "requestAnimationFrame").andCallFake((fn) => {
+  beforeEach(async () => {
+    spyOn(window, "requestAnimationFrame").and.callFake((fn) => {
       fn();
     });
-    spyOn(window, "cancelAnimationFrame").andCallFake((_i) => null);
+    spyOn(window, "cancelAnimationFrame").and.callFake((_i) => null);
 
     projectPath = temp.mkdirSync("git-diff-spec-");
 
@@ -28,32 +28,19 @@ describe("GitDiff when targeting nested repository", () => {
 
     jasmine.attachToDOM(lumine.workspace.getElement());
 
-    waitsForPromise(async () => {
-      await lumine.workspace.open(path.join(nestedPath, "sample.js"));
-      await lumine.packages.activatePackage("git-diff");
-    });
+    await lumine.workspace.open(path.join(nestedPath, "sample.js"));
+    await lumine.packages.activatePackage("git-diff");
 
-    runs(() => {
-      editor = lumine.workspace.getActiveTextEditor();
-      editorElement = lumine.views.getView(editor);
-    });
+    editor = lumine.workspace.getActiveTextEditor();
+    editorElement = lumine.views.getView(editor);
   });
 
-  afterEach(() => {
-    waitsForPromise(async () => {
-      // Deleting a still-watched directory is refused on Windows, and watched
-      // roots vanishing beneath the file-watcher worker has crashed it on
-      // macOS. Wait for the arms to settle (an arming watch cannot be
-      // stopped), release every native watcher, and only then delete the
-      // temp roots.
-      await Promise.allSettled(
-        lumine.project
-          .getPaths()
-          .map((projectPath) => lumine.project.getWatcherPromise(projectPath)),
-      );
-      await stopAllWatchers();
-      temp.cleanup();
-    });
+  afterEach(async () => {
+    await Promise.allSettled(
+      lumine.project.getPaths().map((projectPath) => lumine.project.getWatcherPromise(projectPath)),
+    );
+    await stopAllWatchers();
+    temp.cleanup();
   });
 
   describe("When git-diff targets a file in a nested git-repository", () => {
@@ -68,16 +55,14 @@ describe("GitDiff when targeting nested repository", () => {
      * markers exist and we know we're targeting the proper repository,
      * If no markers exist, we're targeting an ancestor repo.
      */
-    it("uses the innermost repository", () => {
+    it("uses the innermost repository", async () => {
       editor.insertText("a");
       advanceClock(editor.getBuffer().stoppedChangingDelay);
       // The diff is computed off-thread by the git-host worker; against the
       // ancestor repository the file is untracked and never gains a marker,
       // so waiting for one still discriminates the two repositories.
-      waitsFor(() => editorElement.querySelectorAll(".git-line-modified").length > 0);
-      runs(() => {
-        expect(editorElement.querySelectorAll(".git-line-modified").length).toBe(1);
-      });
+      await conditionPromise(() => editorElement.querySelectorAll(".git-line-modified").length > 0);
+      expect(editorElement.querySelectorAll(".git-line-modified").length).toBe(1);
     });
   });
 });

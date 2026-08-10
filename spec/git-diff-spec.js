@@ -6,13 +6,13 @@ const { stopAllWatchers } = require(path.join(lumine.app.getResourcePath(), "src
 describe("GitDiff package", () => {
   let editor, editorElement, projectPath, screenUpdates;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     screenUpdates = 0;
-    spyOn(window, "requestAnimationFrame").andCallFake((fn) => {
+    spyOn(window, "requestAnimationFrame").and.callFake((fn) => {
       fn();
       screenUpdates++;
     });
-    spyOn(window, "cancelAnimationFrame").andCallFake((_i) => null);
+    spyOn(window, "cancelAnimationFrame").and.callFake((_i) => null);
 
     projectPath = temp.mkdirSync("git-diff-spec-");
     const otherPath = temp.mkdirSync("some-other-path-");
@@ -23,183 +23,144 @@ describe("GitDiff package", () => {
 
     jasmine.attachToDOM(lumine.workspace.getElement());
 
-    waitsForPromise(async () => {
-      await lumine.workspace.open(path.join(projectPath, "sample.js"));
-      await lumine.packages.activatePackage("git-diff");
-    });
+    await lumine.workspace.open(path.join(projectPath, "sample.js"));
+    await lumine.packages.activatePackage("git-diff");
 
-    runs(() => {
-      editor = lumine.workspace.getActiveTextEditor();
-      editorElement = lumine.views.getView(editor);
-    });
+    editor = lumine.workspace.getActiveTextEditor();
+    editorElement = lumine.views.getView(editor);
   });
 
-  afterEach(() => {
-    waitsForPromise(async () => {
-      // Deleting a still-watched directory is refused on Windows, and watched
-      // roots vanishing beneath the file-watcher worker has crashed it on
-      // macOS. Wait for the arms to settle (an arming watch cannot be
-      // stopped), release every native watcher, and only then delete the
-      // temp roots.
-      await Promise.allSettled(
-        lumine.project
-          .getPaths()
-          .map((projectPath) => lumine.project.getWatcherPromise(projectPath)),
-      );
-      await stopAllWatchers();
-      temp.cleanup();
-    });
+  afterEach(async () => {
+    await Promise.allSettled(
+      lumine.project.getPaths().map((projectPath) => lumine.project.getWatcherPromise(projectPath)),
+    );
+    await stopAllWatchers();
+    temp.cleanup();
   });
 
   describe("when the editor has no changes", () => {
-    it("doesn't mark the editor", () => {
-      waitsFor(() => screenUpdates > 0);
-      runs(() => expect(editor.getMarkers().length).toBe(0));
+    it("doesn't mark the editor", async () => {
+      await conditionPromise(() => screenUpdates > 0);
+      expect(editor.getMarkers().length).toBe(0);
     });
   });
 
   describe("when a repository event changes none of the diff inputs", () => {
-    it("skips recomputing the line diffs", () => {
+    it("skips recomputing the line diffs", async () => {
       let repository, afterFirstEdit;
 
-      waitsFor(() => screenUpdates > 0);
-      waitsForPromise(async () => {
-        repository = await lumine.repositories.resolveForPath(path.join(projectPath, "sample.js"));
-      });
+      await conditionPromise(() => screenUpdates > 0);
+      repository = await lumine.repositories.resolveForPath(path.join(projectPath, "sample.js"));
       // The file's status is one of the inputs a recomputation is skipped on,
       // and it arrives from the git worker. Recording a diff before the snapshot
       // lands leaves the view holding the status of a file git has not described
       // yet, so the next repository event sees an input that genuinely changed
       // and recomputes — correctly, but not what this spec is about.
-      waitsForPromise(() => repository.ensureStatusSnapshot());
-      runs(() => {
-        expect(repository).toBeTruthy();
-        spyOn(repository, "getLineDiffsAsync").andCallThrough();
+      await repository.ensureStatusSnapshot();
+      expect(repository).toBeTruthy();
+      spyOn(repository, "getLineDiffsAsync").and.callThrough();
 
-        editor.insertText("a");
-        advanceClock(editor.getBuffer().stoppedChangingDelay);
-      });
+      editor.insertText("a");
+      advanceClock(editor.getBuffer().stoppedChangingDelay);
 
       // The buffer edit forces a compute that also applies (markers appear).
-      waitsFor(() => editor.getMarkers().length > 0);
-      runs(() => {
-        afterFirstEdit = repository.getLineDiffsAsync.callCount;
+      await conditionPromise(() => editor.getMarkers().length > 0);
+      afterFirstEdit = repository.getLineDiffsAsync.calls.count();
 
-        // An index-only event — staging, unstaging — reuses the same head oid
-        // and buffer, so no worker round trip happens.
-        repository.emitter.emit("did-change-status-snapshot", repository.getStatusSnapshot());
-        expect(repository.getLineDiffsAsync.callCount).toBe(afterFirstEdit);
+      // An index-only event — staging, unstaging — reuses the same head oid
+      // and buffer, so no worker round trip happens.
+      repository.emitter.emit("did-change-status-snapshot", repository.getStatusSnapshot());
+      expect(repository.getLineDiffsAsync.calls.count()).toBe(afterFirstEdit);
 
-        // Another buffer change still recomputes...
-        editor.insertText("b");
-        advanceClock(editor.getBuffer().stoppedChangingDelay);
-      });
+      // Another buffer change still recomputes...
+      editor.insertText("b");
+      advanceClock(editor.getBuffer().stoppedChangingDelay);
 
-      waitsFor(() => repository.getLineDiffsAsync.callCount > afterFirstEdit);
-      runs(() => {
-        // ...and once it lands, an input-free repository event skips again.
-        const afterSecondEdit = repository.getLineDiffsAsync.callCount;
-        repository.emitter.emit("did-change-status-snapshot", repository.getStatusSnapshot());
-        expect(repository.getLineDiffsAsync.callCount).toBe(afterSecondEdit);
-      });
+      await conditionPromise(() => repository.getLineDiffsAsync.calls.count() > afterFirstEdit);
+      // ...and once it lands, an input-free repository event skips again.
+      const afterSecondEdit = repository.getLineDiffsAsync.calls.count();
+      repository.emitter.emit("did-change-status-snapshot", repository.getStatusSnapshot());
+      expect(repository.getLineDiffsAsync.calls.count()).toBe(afterSecondEdit);
     });
   });
 
   describe("when the editor has modified lines", () => {
-    it("highlights the modified lines", () => {
+    it("highlights the modified lines", async () => {
       expect(editorElement.querySelectorAll(".git-line-modified").length).toBe(0);
       editor.insertText("a");
       advanceClock(editor.getBuffer().stoppedChangingDelay);
 
-      waitsFor(() => editor.getMarkers().length > 0);
-      runs(() => {
-        expect(editorElement.querySelectorAll(".git-line-modified").length).toBe(1);
-        expect(editorElement.querySelector(".git-line-modified")).toHaveData("buffer-row", 0);
-      });
+      await conditionPromise(() => editor.getMarkers().length > 0);
+      expect(editorElement.querySelectorAll(".git-line-modified").length).toBe(1);
+      expect(editorElement.querySelector(".git-line-modified")).toHaveData("buffer-row", 0);
     });
   });
 
   describe("when the editor has added lines", () => {
-    it("highlights the added lines", () => {
+    it("highlights the added lines", async () => {
       expect(editorElement.querySelectorAll(".git-line-added").length).toBe(0);
       editor.moveToEndOfLine();
       editor.insertNewline();
       editor.insertText("a");
       advanceClock(editor.getBuffer().stoppedChangingDelay);
-      waitsFor(() => editor.getMarkers().length > 0);
-      runs(() => {
-        expect(editorElement.querySelectorAll(".git-line-added").length).toBe(1);
-        expect(editorElement.querySelector(".git-line-added")).toHaveData("buffer-row", 1);
-      });
+      await conditionPromise(() => editor.getMarkers().length > 0);
+      expect(editorElement.querySelectorAll(".git-line-added").length).toBe(1);
+      expect(editorElement.querySelector(".git-line-added")).toHaveData("buffer-row", 1);
     });
   });
 
   describe("when the editor has removed lines", () => {
-    it("highlights the line preceeding the deleted lines", () => {
+    it("highlights the line preceeding the deleted lines", async () => {
       expect(editorElement.querySelectorAll(".git-line-added").length).toBe(0);
       editor.setCursorBufferPosition([5]);
       editor.deleteLine();
       advanceClock(editor.getBuffer().stoppedChangingDelay);
-      waitsFor(() => editor.getMarkers().length > 0);
-      runs(() => {
-        expect(editorElement.querySelectorAll(".git-line-removed").length).toBe(1);
-        expect(editorElement.querySelector(".git-line-removed")).toHaveData("buffer-row", 4);
-      });
+      await conditionPromise(() => editor.getMarkers().length > 0);
+      expect(editorElement.querySelectorAll(".git-line-removed").length).toBe(1);
+      expect(editorElement.querySelector(".git-line-removed")).toHaveData("buffer-row", 4);
     });
   });
 
   describe("when the editor has removed the first line", () => {
-    it("highlights the line preceeding the deleted lines", () => {
+    it("highlights the line preceeding the deleted lines", async () => {
       expect(editorElement.querySelectorAll(".git-line-added").length).toBe(0);
       editor.setCursorBufferPosition([0, 0]);
       editor.deleteLine();
       advanceClock(editor.getBuffer().stoppedChangingDelay);
-      waitsFor(() => editor.getMarkers().length > 0);
-      runs(() => {
-        expect(editorElement.querySelectorAll(".git-previous-line-removed").length).toBe(1);
-        expect(editorElement.querySelector(".git-previous-line-removed")).toHaveData(
-          "buffer-row",
-          0,
-        );
-      });
+      await conditionPromise(() => editor.getMarkers().length > 0);
+      expect(editorElement.querySelectorAll(".git-previous-line-removed").length).toBe(1);
+      expect(editorElement.querySelector(".git-previous-line-removed")).toHaveData("buffer-row", 0);
     });
   });
 
   describe("when a modified line is restored to the HEAD version contents", () => {
-    it("removes the diff highlight", () => {
+    it("removes the diff highlight", async () => {
       expect(editorElement.querySelectorAll(".git-line-modified").length).toBe(0);
       editor.insertText("a");
       advanceClock(editor.getBuffer().stoppedChangingDelay);
-      waitsFor(() => editorElement.querySelectorAll(".git-line-modified").length > 0);
-      runs(() => {
-        expect(editorElement.querySelectorAll(".git-line-modified").length).toBe(1);
-        editor.backspace();
-        advanceClock(editor.getBuffer().stoppedChangingDelay);
-      });
-      waitsFor(() => editorElement.querySelectorAll(".git-line-modified").length < 1);
-      runs(() => {
-        expect(editorElement.querySelectorAll(".git-line-modified").length).toBe(0);
-      });
+      await conditionPromise(() => editorElement.querySelectorAll(".git-line-modified").length > 0);
+      expect(editorElement.querySelectorAll(".git-line-modified").length).toBe(1);
+      editor.backspace();
+      advanceClock(editor.getBuffer().stoppedChangingDelay);
+
+      await conditionPromise(() => editorElement.querySelectorAll(".git-line-modified").length < 1);
+      expect(editorElement.querySelectorAll(".git-line-modified").length).toBe(0);
     });
   });
 
   describe("when a modified file is opened", () => {
-    it("highlights the changed lines", () => {
+    it("highlights the changed lines", async () => {
       fs.writeFileSync(path.join(projectPath, "sample.txt"), "Some different text.");
 
-      waitsForPromise(() => lumine.workspace.open(path.join(projectPath, "sample.txt")));
+      await lumine.workspace.open(path.join(projectPath, "sample.txt"));
 
-      runs(() => {
-        editor = lumine.workspace.getActiveTextEditor();
-        editorElement = editor.getElement();
-      });
+      editor = lumine.workspace.getActiveTextEditor();
+      editorElement = editor.getElement();
 
-      waitsFor(() => editor.getMarkers().length > 0);
+      await conditionPromise(() => editor.getMarkers().length > 0);
 
-      runs(() => {
-        expect(editorElement.querySelectorAll(".git-line-modified").length).toBe(1);
-        expect(editorElement.querySelector(".git-line-modified")).toHaveData("buffer-row", 0);
-      });
+      expect(editorElement.querySelectorAll(".git-line-modified").length).toBe(1);
+      expect(editorElement.querySelector(".git-line-modified")).toHaveData("buffer-row", 0);
     });
   });
 
@@ -209,7 +170,7 @@ describe("GitDiff package", () => {
     // metacharacter, which `git show <rev>:<path>` used to answer with HEAD's
     // commit message at exit 0 rather than reporting the path as absent —
     // between them, every line of an ignored file showed as changed.
-    it("leaves the editor unmarked", () => {
+    it("leaves the editor unmarked", async () => {
       let repository, ignoredEditor;
       const ignoredPath = path.join(projectPath, "[e] dir", "out.log");
 
@@ -217,42 +178,34 @@ describe("GitDiff package", () => {
       fs.mkdirSync(path.join(projectPath, "[e] dir"));
       fs.writeFileSync(ignoredPath, "one\ntwo\nthree\n");
 
-      waitsForPromise(async () => {
-        repository = await lumine.repositories.resolveForPath(ignoredPath);
-        await repository.refreshStatusSnapshot();
-        ignoredEditor = await lumine.workspace.open(ignoredPath);
-      });
+      repository = await lumine.repositories.resolveForPath(ignoredPath);
+      await repository.refreshStatusSnapshot();
+      ignoredEditor = await lumine.workspace.open(ignoredPath);
 
-      waitsForPromise(async () => {
-        expect(repository.getStatusEntry(ignoredPath).ignored).toBe(true);
-        // Absent at HEAD however the path is spelled.
-        expect(await repository.getFileAtRevision(ignoredPath, "HEAD")).toBeNull();
-      });
+      expect(repository.getStatusEntry(ignoredPath).ignored).toBe(true);
+      // Absent at HEAD however the path is spelled.
+      expect(await repository.getFileAtRevision(ignoredPath, "HEAD")).toBeNull();
 
-      runs(() => {
-        spyOn(repository, "getLineDiffsAsync").andCallThrough();
-        ignoredEditor.insertText("a");
-        advanceClock(ignoredEditor.getBuffer().stoppedChangingDelay);
-        expect(repository.getLineDiffsAsync).not.toHaveBeenCalled();
-        expect(ignoredEditor.getMarkers().length).toBe(0);
-      });
+      spyOn(repository, "getLineDiffsAsync").and.callThrough();
+      ignoredEditor.insertText("a");
+      advanceClock(ignoredEditor.getBuffer().stoppedChangingDelay);
+      expect(repository.getLineDiffsAsync).not.toHaveBeenCalled();
+      expect(ignoredEditor.getMarkers().length).toBe(0);
     });
   });
 
   describe("when the project paths change", () => {
-    it("doesn't try to use the destroyed git repository", () => {
+    it("doesn't try to use the destroyed git repository", async () => {
       editor.deleteLine();
       lumine.project.setPaths([temp.mkdirSync("no-repository")]);
       advanceClock(editor.getBuffer().stoppedChangingDelay);
-      waitsFor(() => editor.getMarkers().length === 0);
-      runs(() => {
-        expect(editor.getMarkers().length).toBe(0);
-      });
+      await conditionPromise(() => editor.getMarkers().length === 0);
+      expect(editor.getMarkers().length).toBe(0);
     });
   });
 
   describe("move-to-next-diff/move-to-previous-diff events", () => {
-    it("moves the cursor to first character of the next/previous diff line", () => {
+    it("moves the cursor to first character of the next/previous diff line", async () => {
       editor.insertText("a");
       editor.setCursorBufferPosition([5]);
       editor.deleteLine();
@@ -260,61 +213,57 @@ describe("GitDiff package", () => {
 
       // The diff is computed off-thread by the git-host worker now, so wait for
       // the deletion marker before exercising the navigation commands.
-      waitsFor(() => editorElement.querySelectorAll(".git-line-removed").length > 0);
-      runs(() => {
-        editor.setCursorBufferPosition([0]);
-        lumine.commands.dispatch(editorElement, "git-diff:move-to-next-diff");
-        expect(editor.getCursorBufferPosition()).toEqual([4, 4]);
+      await conditionPromise(() => editorElement.querySelectorAll(".git-line-removed").length > 0);
+      editor.setCursorBufferPosition([0]);
+      lumine.commands.dispatch(editorElement, "git-diff:move-to-next-diff");
+      expect(editor.getCursorBufferPosition()).toEqual([4, 4]);
 
-        lumine.commands.dispatch(editorElement, "git-diff:move-to-previous-diff");
-        expect(editor.getCursorBufferPosition()).toEqual([0, 0]);
-      });
+      lumine.commands.dispatch(editorElement, "git-diff:move-to-previous-diff");
+      expect(editor.getCursorBufferPosition()).toEqual([0, 0]);
     });
 
-    it("wraps around to the first/last diff in the file", () => {
+    it("wraps around to the first/last diff in the file", async () => {
       editor.insertText("a");
       editor.setCursorBufferPosition([5]);
       editor.deleteLine();
       advanceClock(editor.getBuffer().stoppedChangingDelay);
 
-      waitsFor(() => editorElement.querySelectorAll(".git-line-removed").length > 0);
-      runs(() => {
-        editor.setCursorBufferPosition([0]);
-        lumine.commands.dispatch(editorElement, "git-diff:move-to-next-diff");
-        expect(editor.getCursorBufferPosition().toArray()).toEqual([4, 4]);
+      await conditionPromise(() => editorElement.querySelectorAll(".git-line-removed").length > 0);
+      editor.setCursorBufferPosition([0]);
+      lumine.commands.dispatch(editorElement, "git-diff:move-to-next-diff");
+      expect(editor.getCursorBufferPosition().toArray()).toEqual([4, 4]);
 
-        lumine.commands.dispatch(editorElement, "git-diff:move-to-next-diff");
-        expect(editor.getCursorBufferPosition().toArray()).toEqual([0, 0]);
+      lumine.commands.dispatch(editorElement, "git-diff:move-to-next-diff");
+      expect(editor.getCursorBufferPosition().toArray()).toEqual([0, 0]);
 
-        lumine.commands.dispatch(editorElement, "git-diff:move-to-previous-diff");
-        expect(editor.getCursorBufferPosition().toArray()).toEqual([4, 4]);
-      });
+      lumine.commands.dispatch(editorElement, "git-diff:move-to-previous-diff");
+      expect(editor.getCursorBufferPosition().toArray()).toEqual([4, 4]);
     });
 
     describe("when the wrapAroundOnMoveToDiff config option is false", () => {
       beforeEach(() => lumine.config.set("git-diff.wrapAroundOnMoveToDiff", false));
 
-      it("does not wraps around to the first/last diff in the file", () => {
+      it("does not wraps around to the first/last diff in the file", async () => {
         editor.insertText("a");
         editor.setCursorBufferPosition([5]);
         editor.deleteLine();
         advanceClock(editor.getBuffer().stoppedChangingDelay);
-        waitsFor(() => editorElement.querySelectorAll(".git-line-removed").length > 0);
+        await conditionPromise(
+          () => editorElement.querySelectorAll(".git-line-removed").length > 0,
+        );
 
-        runs(() => {
-          editor.setCursorBufferPosition([0]);
-          lumine.commands.dispatch(editorElement, "git-diff:move-to-next-diff");
-          expect(editor.getCursorBufferPosition()).toEqual([4, 4]);
+        editor.setCursorBufferPosition([0]);
+        lumine.commands.dispatch(editorElement, "git-diff:move-to-next-diff");
+        expect(editor.getCursorBufferPosition()).toEqual([4, 4]);
 
-          lumine.commands.dispatch(editorElement, "git-diff:move-to-next-diff");
-          expect(editor.getCursorBufferPosition()).toEqual([4, 4]);
+        lumine.commands.dispatch(editorElement, "git-diff:move-to-next-diff");
+        expect(editor.getCursorBufferPosition()).toEqual([4, 4]);
 
-          lumine.commands.dispatch(editorElement, "git-diff:move-to-previous-diff");
-          expect(editor.getCursorBufferPosition()).toEqual([0, 0]);
+        lumine.commands.dispatch(editorElement, "git-diff:move-to-previous-diff");
+        expect(editor.getCursorBufferPosition()).toEqual([0, 0]);
 
-          lumine.commands.dispatch(editorElement, "git-diff:move-to-previous-diff");
-          expect(editor.getCursorBufferPosition()).toEqual([0, 0]);
-        });
+        lumine.commands.dispatch(editorElement, "git-diff:move-to-previous-diff");
+        expect(editor.getCursorBufferPosition()).toEqual([0, 0]);
       });
     });
   });
@@ -324,32 +273,26 @@ describe("GitDiff package", () => {
       lumine.config.set("git-diff.showIconsInEditorGutter", true);
     });
 
-    it("the gutter has a git-diff-icon class", () => {
-      waitsFor(() => screenUpdates > 0);
-      runs(() => {
-        expect(editorElement.querySelector(".gutter")).toHaveClass("git-diff-icon");
-      });
+    it("the gutter has a git-diff-icon class", async () => {
+      await conditionPromise(() => screenUpdates > 0);
+      expect(editorElement.querySelector(".gutter")).toHaveClass("git-diff-icon");
     });
 
-    it("keeps the git-diff-icon class when editor.showLineNumbers is toggled", () => {
-      waitsFor(() => screenUpdates > 0);
+    it("keeps the git-diff-icon class when editor.showLineNumbers is toggled", async () => {
+      await conditionPromise(() => screenUpdates > 0);
 
-      runs(() => {
-        lumine.config.set("editor.showLineNumbers", false);
-        expect(editorElement.querySelector(".gutter")).not.toHaveClass("git-diff-icon");
+      lumine.config.set("editor.showLineNumbers", false);
+      expect(editorElement.querySelector(".gutter")).not.toHaveClass("git-diff-icon");
 
-        lumine.config.set("editor.showLineNumbers", true);
-        expect(editorElement.querySelector(".gutter")).toHaveClass("git-diff-icon");
-      });
+      lumine.config.set("editor.showLineNumbers", true);
+      expect(editorElement.querySelector(".gutter")).toHaveClass("git-diff-icon");
     });
 
-    it("removes the git-diff-icon class when the showIconsInEditorGutter config option set to false", () => {
-      waitsFor(() => screenUpdates > 0);
+    it("removes the git-diff-icon class when the showIconsInEditorGutter config option set to false", async () => {
+      await conditionPromise(() => screenUpdates > 0);
 
-      runs(() => {
-        lumine.config.set("git-diff.showIconsInEditorGutter", false);
-        expect(editorElement.querySelector(".gutter")).not.toHaveClass("git-diff-icon");
-      });
+      lumine.config.set("git-diff.showIconsInEditorGutter", false);
+      expect(editorElement.querySelector(".gutter")).not.toHaveClass("git-diff-icon");
     });
   });
 });

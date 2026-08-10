@@ -11,7 +11,7 @@ const commands = [
 describe("git-diff", () => {
   let editor, element;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     const projectPath = temp.mkdirSync("git-diff-spec-");
     fs.copySync(path.join(__dirname, "fixtures", "working-dir"), projectPath);
     fs.moveSync(path.join(projectPath, "git.git"), path.join(projectPath, ".git"));
@@ -19,27 +19,23 @@ describe("git-diff", () => {
 
     jasmine.attachToDOM(lumine.workspace.getElement());
 
-    waitsForPromise(() => lumine.workspace.open("sample.js"));
+    await lumine.workspace.open("sample.js");
 
-    runs(() => {
-      editor = lumine.workspace.getActiveTextEditor();
-      element = lumine.views.getView(editor);
-    });
+    editor = lumine.workspace.getActiveTextEditor();
+    element = lumine.views.getView(editor);
   });
 
   describe("When the module is deactivated", () => {
-    it("removes all registered command hooks after deactivation.", () => {
-      waitsForPromise(() => lumine.packages.activatePackage("git-diff"));
-      waitsForPromise(() => lumine.packages.deactivatePackage("git-diff"));
-      runs(() => {
-        // NOTE: don't use enable and disable from the Public API.
-        expect(lumine.packages.isPackageActive("git-diff")).toBe(false);
+    it("removes all registered command hooks after deactivation.", async () => {
+      await lumine.packages.activatePackage("git-diff");
+      await lumine.packages.deactivatePackage("git-diff");
+      // NOTE: don't use enable and disable from the Public API.
+      expect(lumine.packages.isPackageActive("git-diff")).toBe(false);
 
-        lumine.commands
-          .findCommands({ target: element })
-          .filter(({ name }) => commands.includes(name))
-          .forEach((command) => expect(commands).not.toContain(command.name));
-      });
+      lumine.commands
+        .findCommands({ target: element })
+        .filter(({ name }) => commands.includes(name))
+        .forEach((command) => expect(commands).not.toContain(command.name));
     });
   });
 });

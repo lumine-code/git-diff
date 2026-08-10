@@ -5,7 +5,7 @@ const temp = require("@lumine-code/temp").track();
 describe("git-diff:toggle-diff-list", () => {
   let diffListView, editor;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     const projectPath = temp.mkdirSync("git-diff-spec-");
     fs.copySync(path.join(__dirname, "fixtures", "working-dir"), projectPath);
     fs.moveSync(path.join(projectPath, "git.git"), path.join(projectPath, ".git"));
@@ -13,18 +13,16 @@ describe("git-diff:toggle-diff-list", () => {
 
     jasmine.attachToDOM(lumine.workspace.getElement());
 
-    waitsForPromise(() => lumine.packages.activatePackage("git-diff"));
+    await lumine.packages.activatePackage("git-diff");
 
-    waitsForPromise(() => lumine.workspace.open("sample.js"));
+    await lumine.workspace.open("sample.js");
 
-    runs(() => {
-      editor = lumine.workspace.getActiveTextEditor();
-      editor.setCursorBufferPosition([8, 30]);
-      editor.insertText("a");
-      lumine.commands.dispatch(editor.getElement(), "git-diff:toggle-diff-list");
-    });
+    editor = lumine.workspace.getActiveTextEditor();
+    editor.setCursorBufferPosition([8, 30]);
+    editor.insertText("a");
+    lumine.commands.dispatch(editor.getElement(), "git-diff:toggle-diff-list");
 
-    waitsFor(() => {
+    await conditionPromise(() => {
       diffListView = document.querySelector(".diff-list-view");
       return diffListView && diffListView.querySelectorAll("li").length > 0;
     });
