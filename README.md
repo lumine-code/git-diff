@@ -4,17 +4,15 @@ Marks lines in the editor gutter that have been added, edited, or deleted since 
 
 ## Features
 
-- **Gutter markers**: marks added and edited lines with colored line numbers, and deleted
-  lines with a compact horizontal marker.
-- **Icon or marker style**: shows colored icons instead of the default line-number and
-  deletion markers.
+- **Gutter markers**: marks added and edited lines with colored line numbers, and deleted lines with a compact horizontal marker.
+- **Icon or marker style**: shows colored icons instead of the default line-number and deletion markers.
 - **Diff navigation**: moves the cursor to the next or previous diff in the editor.
 - **Diff list**: opens a searchable list of all diffs in the current file.
 - **Wrap-around**: optionally wraps around to the first or last diff when navigating.
 
 ## Installation
 
-To install `git-diff` search for _git-diff_ in the Install pane of the Lumine settings or run `lumine --install lumine-code/git-diff`.
+To install `git-diff` search for it in the Install pane of the Lumine settings, or run the command `lumine --install lumine-code/git-diff`.
 
 ## Commands
 
