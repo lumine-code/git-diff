@@ -242,6 +242,19 @@ describe("GitDiff package", () => {
       expect(editor.getCursorBufferPosition().toArray()).toEqual([4, 4]);
     });
 
+    // A view exists for every editor, but its diffs stay null outside a
+    // repository — the guard has to read the diffs, not the view.
+    it("warns instead of throwing for an editor outside any repository", async () => {
+      const outsideEditor = await lumine.workspace.open();
+      const outsideElement = lumine.views.getView(outsideEditor);
+      spyOn(lumine.notifications, "addWarning");
+
+      expect(() =>
+        lumine.commands.dispatch(outsideElement, "git-diff:move-to-next-diff"),
+      ).not.toThrow();
+      expect(lumine.notifications.addWarning).toHaveBeenCalled();
+    });
+
     describe("when the wrapAroundOnMoveToDiff config option is false", () => {
       beforeEach(() => lumine.config.set("git-diff.wrapAroundOnMoveToDiff", false));
 
