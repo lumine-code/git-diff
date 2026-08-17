@@ -37,6 +37,13 @@
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },
+  "providedServices": {
+    "marker.layer": {
+      "versions": {
+        "1.0.0": "provideMarkerLayer"
+      }
+    }
+  },
   "configSchema": {
     "showIconsInEditorGutter": {
       "title": "Show Icons In Editor Gutter",
@@ -49,6 +56,26 @@
       "description": "Wraps around to the first/last diff in the file when moving to next/previous diff.",
       "type": "boolean",
       "default": true
+    },
+    "marker": {
+      "title": "Marker",
+      "description": "Settings of the git-diff layer drawn on the scrollbar and minimap by the marker hub.",
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "title": "Enabled",
+          "description": "Show git diff markers on the scrollbar and minimap.",
+          "type": "boolean",
+          "default": true
+        },
+        "threshold": {
+          "title": "Threshold",
+          "description": "Hide markers if count exceeds this value. Zero means no limit.",
+          "type": "integer",
+          "minimum": 0,
+          "default": 0
+        }
+      }
     }
   },
   "devDependencies": {

@@ -9,6 +9,7 @@ Marks lines in the editor gutter that have been added, edited, or deleted since 
 - **Diff navigation**: moves the cursor to the next or previous diff in the editor.
 - **Diff list**: opens a searchable list of all diffs in the current file.
 - **Wrap-around**: optionally wraps around to the first or last diff when navigating.
+- **Scrollbar markers**: shows the changed lines on the scrollbar and minimap via the marker hub.
 
 ## Installation
 
@@ -21,6 +22,10 @@ Commands available in `lumine-workspace`:
 - `git-diff:move-to-next-diff`: move the cursor to the next diff,
 - `git-diff:move-to-previous-diff`: move the cursor to the previous diff,
 - `git-diff:toggle-diff-list`: toggle the list of diffs in the current file.
+
+## Services
+
+- `marker.layer`: provided to draw the changed lines on the editor's overview maps (scrollbar, minimap).
 
 ## Customization
 
