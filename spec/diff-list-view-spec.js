@@ -13,13 +13,17 @@ describe("git-diff:toggle-diff-list", () => {
 
     jasmine.attachToDOM(lumine.workspace.getElement());
 
+    await lumine.workspace.open(path.join(projectPath, "sample.js"));
     await lumine.packages.activatePackage("git-diff");
 
-    await lumine.workspace.open("sample.js");
-
     editor = lumine.workspace.getActiveTextEditor();
+
     editor.setCursorBufferPosition([8, 30]);
     editor.insertText("a");
+    // The list reads the diffs the editor's view computed, so wait for that
+    // computation to land before toggling.
+    advanceClock(editor.getBuffer().stoppedChangingDelay);
+    await conditionPromise(() => editor.getMarkers().length > 0);
     lumine.commands.dispatch(editor.getElement(), "git-diff:toggle-diff-list");
 
     await conditionPromise(() => {
