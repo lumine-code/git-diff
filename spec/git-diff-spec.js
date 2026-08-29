@@ -206,6 +206,25 @@ describe("GitDiff package", () => {
     });
   });
 
+  describe("when an editor is destroyed during a surface transition", () => {
+    it("drops the late transition completion without scheduling a diff", async () => {
+      const mainModule = lumine.packages.getActivePackage("git-diff").mainModule;
+      const view = mainModule.markerLayer.views.get(editor);
+
+      await conditionPromise(() => view.buffer != null);
+      const transition = view.beginWindowSurfaceTransition();
+      spyOn(view, "scheduleUpdate");
+
+      editor.destroy();
+      transition.commit();
+
+      expect(view.destroyed).toBe(true);
+      expect(view.buffer).toBeNull();
+      expect(view.scheduleUpdate).not.toHaveBeenCalled();
+      await expectAsync(view.updateDiffs()).toBeResolved();
+    });
+  });
+
   describe("move-to-next-diff/move-to-previous-diff events", () => {
     it("moves the cursor to first character of the next/previous diff line", async () => {
       editor.insertText("a");
