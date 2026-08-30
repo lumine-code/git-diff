@@ -206,22 +206,27 @@ describe("GitDiff package", () => {
     });
   });
 
-  describe("when an editor is destroyed during a surface transition", () => {
-    it("drops the late transition completion without scheduling a diff", async () => {
+  describe("when an editor is destroyed during a diff update", () => {
+    it("drops the late result without touching released state", async () => {
       const mainModule = lumine.packages.getActivePackage("git-diff").mainModule;
       const view = mainModule.markerLayer.views.get(editor);
-
       await conditionPromise(() => view.buffer != null);
-      const transition = view.beginWindowSurfaceTransition();
-      spyOn(view, "scheduleUpdate");
+
+      let resolveDiffs;
+      const diffs = new Promise((resolve) => {
+        resolveDiffs = resolve;
+      });
+      spyOn(view.repository, "getLineDiffsAsync").and.returnValue(diffs);
+      view.bufferChangedSinceDiff = true;
+      const update = view.updateDiffs();
 
       editor.destroy();
-      transition.commit();
+      resolveDiffs([]);
 
+      await expectAsync(update).toBeResolved();
       expect(view.destroyed).toBe(true);
       expect(view.buffer).toBeNull();
-      expect(view.scheduleUpdate).not.toHaveBeenCalled();
-      await expectAsync(view.updateDiffs()).toBeResolved();
+      expect(view.markers.size).toBe(0);
     });
   });
 
