@@ -308,30 +308,53 @@ describe("GitDiff package", () => {
   });
 
   describe("when the showIconsInEditorGutter config option is true", () => {
+    const lineNumberGutterSelector = '[gutter-name="line-number"]';
+
     beforeEach(() => {
       lumine.config.set("git-diff.showIconsInEditorGutter", true);
     });
 
     it("the gutter has a git-diff-icon class", async () => {
       await conditionPromise(() => screenUpdates > 0);
-      expect(editorElement.querySelector(".gutter")).toHaveClass("git-diff-icon");
+      expect(editorElement.querySelector(lineNumberGutterSelector)).toHaveClass("git-diff-icon");
+    });
+
+    it("decorates the line-number gutter when a custom gutter precedes it", async () => {
+      await conditionPromise(() => screenUpdates > 0);
+      editor.addGutter({ name: "custom" });
+      await conditionPromise(() => editorElement.querySelector('[gutter-name="custom"]'));
+
+      const gutters = editorElement.querySelectorAll(".gutter");
+      expect(gutters[0].getAttribute("gutter-name")).toBe("custom");
+
+      lumine.config.set("git-diff.showIconsInEditorGutter", false);
+      lumine.config.set("git-diff.showIconsInEditorGutter", true);
+
+      expect(editorElement.querySelector('[gutter-name="custom"]')).not.toHaveClass(
+        "git-diff-icon",
+      );
+      expect(editorElement.querySelector(lineNumberGutterSelector)).toHaveClass("git-diff-icon");
     });
 
     it("keeps the git-diff-icon class when editor.showLineNumbers is toggled", async () => {
       await conditionPromise(() => screenUpdates > 0);
 
       lumine.config.set("editor.showLineNumbers", false);
-      expect(editorElement.querySelector(".gutter")).not.toHaveClass("git-diff-icon");
+      expect(editorElement.querySelector(lineNumberGutterSelector)).not.toHaveClass(
+        "git-diff-icon",
+      );
 
       lumine.config.set("editor.showLineNumbers", true);
-      expect(editorElement.querySelector(".gutter")).toHaveClass("git-diff-icon");
+      expect(editorElement.querySelector(lineNumberGutterSelector)).toHaveClass("git-diff-icon");
     });
 
     it("removes the git-diff-icon class when the showIconsInEditorGutter config option set to false", async () => {
       await conditionPromise(() => screenUpdates > 0);
 
       lumine.config.set("git-diff.showIconsInEditorGutter", false);
-      expect(editorElement.querySelector(".gutter")).not.toHaveClass("git-diff-icon");
+      expect(editorElement.querySelector(lineNumberGutterSelector)).not.toHaveClass(
+        "git-diff-icon",
+      );
     });
   });
 });
