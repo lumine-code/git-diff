@@ -35,7 +35,7 @@ describe("git-diff:toggle-diff-list", () => {
   it("shows a list of all diff hunks", () => {
     diffListView = document.querySelector(".diff-list-view ol");
     expect(diffListView.textContent).toBe("while (items.length > 0) {a-9,1 +9,1");
-    const list = diffListView.closest(".diff-list-view").getModel();
+    const list = diffListView.closest("lumine-input-dialog").getModel();
     const [diff] = list.getItems();
     expect(list.getItemId(diff)).toBe(
       JSON.stringify([diff.oldStart, diff.oldLines, diff.newStart, diff.newLines]),
@@ -52,7 +52,7 @@ describe("git-diff:toggle-diff-list", () => {
 
   it("moves the cursor to the selected hunk", async () => {
     editor.setCursorBufferPosition([0, 0]);
-    const list = document.querySelector(".diff-list-view").getModel();
+    const list = document.querySelector(".diff-list-view lumine-input-dialog").getModel();
     const finished = new Promise((resolve) => {
       const subscription = list.onDidFinishAction((event) => {
         subscription.dispose();
