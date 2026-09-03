@@ -35,11 +35,33 @@ describe("git-diff:toggle-diff-list", () => {
   it("shows a list of all diff hunks", () => {
     diffListView = document.querySelector(".diff-list-view ol");
     expect(diffListView.textContent).toBe("while (items.length > 0) {a-9,1 +9,1");
+    const list = diffListView.closest(".diff-list-view").getModel();
+    const [diff] = list.getItems();
+    expect(list.getItemId(diff)).toBe(
+      JSON.stringify([diff.oldStart, diff.oldLines, diff.newStart, diff.newLines]),
+    );
+    expect(list.getActions()).toContain(
+      jasmine.objectContaining({
+        command: "git-diff:open-diff",
+        context: "item",
+        primary: true,
+        disposition: "close",
+      }),
+    );
   });
 
-  it("moves the cursor to the selected hunk", () => {
+  it("moves the cursor to the selected hunk", async () => {
     editor.setCursorBufferPosition([0, 0]);
-    lumine.commands.dispatch(document.querySelector(".diff-list-view"), "core:confirm");
+    const list = document.querySelector(".diff-list-view").getModel();
+    const finished = new Promise((resolve) => {
+      const subscription = list.onDidFinishAction((event) => {
+        subscription.dispose();
+        resolve(event);
+      });
+    });
+
+    lumine.commands.dispatch(list.getElement(), "core:confirm");
+    expect((await finished).status).toBe("success");
     expect(editor.getCursorBufferPosition()).toEqual([8, 4]);
   });
 });
