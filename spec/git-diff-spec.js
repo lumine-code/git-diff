@@ -204,28 +204,164 @@ describe("GitDiff package", () => {
       await conditionPromise(() => editor.getMarkers().length === 0);
       expect(editor.getMarkers().length).toBe(0);
     });
+
+    it("clears old-path markers before resolving the replacement repository", async () => {
+      const mainModule = lumine.packages.getActivePackage("git-diff").mainModule;
+      const view = mainModule.markerLayer.views.get(editor);
+
+      editor.insertText("a");
+      advanceClock(editor.getBuffer().stoppedChangingDelay);
+      await conditionPromise(() => view.diffs?.length > 0);
+
+      const updates = [];
+      const subscription = view.onDidUpdateDiffs((diffs) => updates.push(diffs));
+      const resubscribe = view.subscribeToRepository();
+
+      expect(view.diffs).toEqual([]);
+      expect(view.markers.size).toBe(0);
+      expect(updates.at(-1)).toEqual([]);
+
+      await resubscribe;
+      await conditionPromise(() => view.diffAbortController == null);
+      subscription.dispose();
+    });
   });
 
   describe("when an editor is destroyed during a diff update", () => {
-    it("drops the late result without touching released state", async () => {
+    it("aborts the request and drops a late result without touching released state", async () => {
       const mainModule = lumine.packages.getActivePackage("git-diff").mainModule;
       const view = mainModule.markerLayer.views.get(editor);
       await conditionPromise(() => view.buffer != null);
 
-      let resolveDiffs;
-      const diffs = new Promise((resolve) => {
-        resolveDiffs = resolve;
-      });
-      spyOn(view.repository, "getLineDiffsAsync").and.returnValue(diffs);
+      let request;
+      spyOn(view.repository, "getLineDiffsAsync").and.callFake(
+        (filePath, text, { signal }) =>
+          new Promise((resolve) => {
+            request = { signal, resolve };
+          }),
+      );
       view.bufferChangedSinceDiff = true;
       const update = view.updateDiffs();
+      await conditionPromise(() => request != null);
 
       editor.destroy();
-      resolveDiffs([]);
+      expect(request.signal.aborted).toBe(true);
+      request.resolve([]);
 
       await expectAsync(update).toBeResolved();
       expect(view.destroyed).toBe(true);
       expect(view.buffer).toBeNull();
+      expect(view.markers.size).toBe(0);
+    });
+  });
+
+  describe("when a newer diff supersedes an in-flight update", () => {
+    it("aborts the stale worker request", async () => {
+      const mainModule = lumine.packages.getActivePackage("git-diff").mainModule;
+      const view = mainModule.markerLayer.views.get(editor);
+      await conditionPromise(() => view.buffer != null);
+
+      const requests = [];
+      spyOn(view.repository, "getLineDiffsAsync").and.callFake(
+        (filePath, text, { signal }) =>
+          new Promise((resolve, reject) => {
+            const request = { signal, resolve };
+            requests.push(request);
+            signal.addEventListener(
+              "abort",
+              () => reject(Object.assign(new Error("aborted"), { name: "AbortError" })),
+              { once: true },
+            );
+          }),
+      );
+
+      view.bufferChangedSinceDiff = true;
+      const first = view.updateDiffs();
+      await conditionPromise(() => requests.length === 1);
+      view.bufferChangedSinceDiff = true;
+      const second = view.updateDiffs();
+      await conditionPromise(() => requests.length === 2);
+
+      expect(requests[0].signal.aborted).toBe(true);
+      await first;
+      // The stale request's finally block must not clear the controller that
+      // now belongs to the current request.
+      expect(view.diffAbortController.signal).toBe(requests[1].signal);
+      requests[1].resolve([]);
+      await second;
+      expect(view.diffAbortController).toBeNull();
+    });
+
+    it("aborts immediately when the buffer changes, before the debounce", async () => {
+      const mainModule = lumine.packages.getActivePackage("git-diff").mainModule;
+      const view = mainModule.markerLayer.views.get(editor);
+      await conditionPromise(() => view.buffer != null);
+
+      let request;
+      spyOn(view.repository, "getLineDiffsAsync").and.callFake(
+        (filePath, text, { signal }) =>
+          new Promise((resolve, reject) => {
+            request = { signal, resolve };
+            signal.addEventListener(
+              "abort",
+              () => reject(Object.assign(new Error("aborted"), { name: "AbortError" })),
+              { once: true },
+            );
+          }),
+      );
+
+      view.bufferChangedSinceDiff = true;
+      const update = view.updateDiffs();
+      await conditionPromise(() => request != null);
+      editor.insertText("a");
+
+      expect(request.signal.aborted).toBe(true);
+      await update;
+      expect(view.bufferChangedSinceDiff).toBe(true);
+    });
+
+    it("drops a result when its HEAD input changed before the next frame", async () => {
+      const mainModule = lumine.packages.getActivePackage("git-diff").mainModule;
+      const view = mainModule.markerLayer.views.get(editor);
+      await conditionPromise(() => view.diffs != null && view.diffAbortController == null);
+
+      const appliedDiffs = view.diffs;
+      let headOid = "old-head";
+      let resolveDiffs;
+      spyOn(view.repository, "getStatusSnapshot").and.callFake(() => ({
+        head: { oid: headOid },
+      }));
+      spyOn(view.repository, "getLineDiffsAsync").and.returnValue(
+        new Promise((resolve) => {
+          resolveDiffs = resolve;
+        }),
+      );
+
+      view.bufferChangedSinceDiff = true;
+      const update = view.updateDiffs();
+      await conditionPromise(() => resolveDiffs != null);
+      headOid = "new-head";
+      resolveDiffs([{ oldStart: 1, newStart: 1, oldLines: 1, newLines: 1 }]);
+      await update;
+
+      expect(view.diffs).toBe(appliedDiffs);
+      expect(view.markers.size).toBe(0);
+    });
+
+    it("clears stale markers when the buffer becomes too large to diff", async () => {
+      const mainModule = lumine.packages.getActivePackage("git-diff").mainModule;
+      const view = mainModule.markerLayer.views.get(editor);
+      await conditionPromise(() => view.buffer != null);
+
+      editor.insertText("a");
+      advanceClock(editor.getBuffer().stoppedChangingDelay);
+      await conditionPromise(() => view.diffs?.length > 0);
+      expect(view.markers.size).toBeGreaterThan(0);
+
+      spyOn(view.buffer, "getLength").and.returnValue(Number.MAX_SAFE_INTEGER);
+      await view.updateDiffs();
+
+      expect(view.diffs).toEqual([]);
       expect(view.markers.size).toBe(0);
     });
   });
