@@ -1,11 +1,13 @@
 const path = require("path");
 const fs = require("@lumine-code/fs-plus");
 const temp = require("@lumine-code/temp").track();
+const captureFixture = require("./fixture");
 
 describe("GitDiff when targeting nested repository", () => {
-  let editor, editorElement, projectPath;
+  let editor, editorElement, projectPath, cleanup;
 
   beforeEach(async () => {
+    cleanup = captureFixture();
     spyOn(window, "requestAnimationFrame").and.callFake((fn) => {
       fn();
     });
@@ -35,11 +37,8 @@ describe("GitDiff when targeting nested repository", () => {
   });
 
   afterEach(async () => {
-    await Promise.allSettled(
-      lumine.project.getPaths().map((projectPath) => lumine.project.getWatcherPromise(projectPath)),
-    );
-    await lumine.fileWatchClient.disposeAll();
-    temp.cleanup();
+    await cleanup(projectPath);
+    await temp.cleanup();
   });
 
   describe("When git-diff targets a file in a nested git-repository", () => {

@@ -2,9 +2,10 @@ const { CompositeDisposable } = require("lumine");
 const path = require("path");
 const fs = require("@lumine-code/fs-plus");
 const temp = require("@lumine-code/temp").track();
+const captureFixture = require("./fixture");
 
 describe("git-diff marker layer", () => {
-  let workspaceElement, mainModule, provider, projectPath, editor, layers;
+  let workspaceElement, mainModule, provider, projectPath, editor, layers, cleanup;
 
   // The spec runner freezes setTimeout, so poll on animation frames instead.
   function waitFor(condition, { frames = 600 } = {}) {
@@ -70,6 +71,7 @@ describe("git-diff marker layer", () => {
   }
 
   beforeEach(async () => {
+    cleanup = captureFixture();
     workspaceElement = lumine.views.getView(lumine.workspace);
     jasmine.attachToDOM(workspaceElement);
     layers = [];
@@ -84,16 +86,12 @@ describe("git-diff marker layer", () => {
     provider = mainModule.provideMarkerLayer();
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     for (const layer of layers) {
       layer.disposables.dispose();
     }
-    try {
-      temp.cleanup();
-    } catch {
-      // Windows can refuse to delete a repository the git host still holds
-      // open; the OS cleans the temp directory eventually.
-    }
+    await cleanup(projectPath);
+    await temp.cleanup();
   });
 
   describe("marker.layer service provider", () => {

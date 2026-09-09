@@ -1,11 +1,13 @@
 const path = require("path");
 const fs = require("@lumine-code/fs-plus");
 const temp = require("@lumine-code/temp").track();
+const captureFixture = require("./fixture");
 
 describe("GitDiff package", () => {
-  let editor, editorElement, projectPath, screenUpdates;
+  let editor, editorElement, projectPath, screenUpdates, cleanup;
 
   beforeEach(async () => {
+    cleanup = captureFixture();
     screenUpdates = 0;
     spyOn(window, "requestAnimationFrame").and.callFake((fn) => {
       fn();
@@ -30,11 +32,8 @@ describe("GitDiff package", () => {
   });
 
   afterEach(async () => {
-    await Promise.allSettled(
-      lumine.project.getPaths().map((projectPath) => lumine.project.getWatcherPromise(projectPath)),
-    );
-    await lumine.fileWatchClient.disposeAll();
-    temp.cleanup();
+    await cleanup(projectPath);
+    await temp.cleanup();
   });
 
   describe("when the editor has no changes", () => {
