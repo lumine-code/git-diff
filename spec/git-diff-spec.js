@@ -1,9 +1,6 @@
 const path = require("path");
 const fs = require("@lumine-code/fs-plus");
 const temp = require("@lumine-code/temp").track();
-const { stopAllWatchers } = require(
-  path.join(lumine.application.getResourcePath(), "src", "path-watcher"),
-);
 
 describe("GitDiff package", () => {
   let editor, editorElement, projectPath, screenUpdates;
@@ -36,7 +33,7 @@ describe("GitDiff package", () => {
     await Promise.allSettled(
       lumine.project.getPaths().map((projectPath) => lumine.project.getWatcherPromise(projectPath)),
     );
-    await stopAllWatchers();
+    await lumine.fileWatchClient.disposeAll();
     temp.cleanup();
   });
 
