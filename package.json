@@ -27,10 +27,6 @@
   "engines": {
     "lumine": "^1.0.0"
   },
-  "backgroundTips": [
-    "You can step through the lines you changed since the last commit with {{ 'git-diff:move-to-next-diff' | keystroke }}",
-    "You can list every change in the current file with {{ 'git-diff:toggle-diff-list' | keystroke }}"
-  ],
   "scripts": {
     "test": "lumine --test spec",
     "lint": "eslint . --max-warnings 0",
@@ -41,6 +37,11 @@
     "marker.layer": {
       "versions": {
         "1.0.0": "provideMarkerLayer"
+      }
+    },
+    "background-tips.provider": {
+      "versions": {
+        "1.0.0": "provideBackgroundTips"
       }
     }
   },
