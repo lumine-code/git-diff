@@ -409,6 +409,8 @@ describe("GitDiff package", () => {
         lumine.commands.dispatch(outsideElement, "git-diff:move-to-next-diff"),
       ).not.toThrow();
       expect(lumine.notifications.addWarning).toHaveBeenCalled();
+
+      outsideEditor.destroy();
     });
 
     describe("when the wrapAroundOnMoveToDiff config option is false", () => {
