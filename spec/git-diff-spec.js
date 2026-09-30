@@ -2,6 +2,7 @@ const path = require("path");
 const fs = require("@lumine-code/fs-plus");
 const temp = require("@lumine-code/temp").track();
 const captureFixture = require("./fixture");
+const { spawn } = require("child_process");
 
 describe("GitDiff package", () => {
   let editor, editorElement, projectPath, screenUpdates, cleanup;
@@ -35,6 +36,60 @@ describe("GitDiff package", () => {
     await cleanup(projectPath);
     await temp.cleanup();
   });
+
+  for (const [type, workingDirectory] of [
+    ["string", (directory) => directory],
+    ["Buffer", (directory) => Buffer.from(directory)],
+  ]) {
+    it(`waits for fixture-owned subprocesses with a ${type} cwd to close before cleanup`, async () => {
+      const child = spawn(
+        process.execPath,
+        [
+          "-e",
+          'process.stdout.write("ready"); process.stdin.on("end", () => process.exit(0)); process.stdin.resume();',
+        ],
+        {
+          cwd: workingDirectory(projectPath),
+          env: { ...process.env, ELECTRON_RUN_AS_NODE: "1" },
+          windowsHide: true,
+        },
+      );
+      const closed = new Promise((resolve) => child.once("close", resolve));
+      await new Promise((resolve, reject) => {
+        child.once("error", reject);
+        child.stdout.once("data", resolve);
+      });
+
+      const settleWatchers = lumine.fileWatchClient.settlePendingTeardown.bind(
+        lumine.fileWatchClient,
+      );
+      let watcherTeardownFinished;
+      const watchersClosed = new Promise((resolve) => {
+        watcherTeardownFinished = resolve;
+      });
+      spyOn(lumine.fileWatchClient, "settlePendingTeardown").and.callFake(async () => {
+        await settleWatchers();
+        watcherTeardownFinished();
+      });
+
+      let cleaned = false;
+      const teardown = cleanup(projectPath).then(() => {
+        cleaned = true;
+      });
+      try {
+        await watchersClosed;
+        await flushMicrotasks();
+        expect(cleaned).toBe(false);
+        expect(child.exitCode).toBeNull();
+      } finally {
+        child.stdin.end();
+        await closed;
+        await teardown;
+      }
+      expect(cleaned).toBe(true);
+      cleanup = async () => {};
+    });
+  }
 
   describe("when the editor has no changes", () => {
     it("doesn't mark the editor", async () => {
