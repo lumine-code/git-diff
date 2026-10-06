@@ -2,14 +2,14 @@
   z-index: 11;
 
   &.added {
-    background-color: var(--text-color-success);
+    background-color: var(--syntax-color-added);
   }
 
   &.modified {
-    background-color: var(--text-color-warning);
+    background-color: var(--syntax-color-modified);
   }
 
   &.removed {
-    background-color: var(--text-color-error);
+    background-color: var(--syntax-color-removed);
   }
 }
