@@ -266,16 +266,30 @@ describe("GitDiff package", () => {
 
       const updates = [];
       const subscription = view.onDidUpdateDiffs((diffs) => updates.push(diffs));
-      const resubscribe = view.subscribeToRepository();
+      const replacementPath = path.join(projectPath, "replacement.js");
+      editor.getBuffer().setPath(replacementPath);
 
       expect(view.diffs).toEqual([]);
       expect(view.markers.size).toBe(0);
       expect(updates.at(-1)).toEqual([]);
 
-      await resubscribe;
+      await conditionPromise(() => view.editorPath === replacementPath);
       await conditionPromise(() => view.diffAbortController == null);
       subscription.dispose();
     });
+  });
+
+  it("starts tracking an untitled editor saved inside an already registered repository", async () => {
+    const untitled = await lumine.workspace.open();
+    const mainModule = lumine.packages.getActivePackage("git-diff").mainModule;
+    const view = mainModule.markerLayer.views.get(untitled);
+    await conditionPromise(() => view.repository === null);
+    untitled.getBuffer().setPath(path.join(projectPath, "sample.js"));
+    await conditionPromise(() => view.repository != null && view.buffer === untitled.getBuffer());
+    untitled.setText("changed while untitled\n");
+    advanceClock(untitled.getBuffer().stoppedChangingDelay);
+    await conditionPromise(() => view.diffs?.length > 0);
+    untitled.destroy();
   });
 
   describe("when an editor is destroyed during a diff update", () => {
