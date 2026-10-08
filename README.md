@@ -2,6 +2,8 @@
 
 Marks lines in the editor gutter that have been added, edited, or deleted since the last commit.
 
+Fork of [pulsar-edit/pulsar](https://github.com/pulsar-edit/pulsar) (`packages/git-diff`).
+
 ## Features
 
 - **Gutter markers**: marks added and edited lines with colored line numbers, and deleted lines with a compact horizontal marker.
