@@ -16,7 +16,7 @@ describe("Git Diff picker pending ownership", () => {
     editor = await lumine.workspace.open();
     editor.setText("first\nchanged\nlast\n");
     editor.setCursorBufferPosition([0, 0]);
-    diff = { oldStart: 2, oldLines: 1, newStart: 2, newLines: 1 };
+    diff = { oldStart: 2, oldLines: 1, newStart: 2, newLines: 1, stage: "unstaged" };
     view = new DiffListView(() => [diff]);
   });
 

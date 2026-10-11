@@ -8,6 +8,14 @@ lumine-text-editor {
       color: var(--syntax-color-added);
     }
 
+    &.git-line-modified.git-line-staged {
+      color: var(--syntax-color-modified-staged);
+    }
+
+    &.git-line-added.git-line-staged {
+      color: var(--syntax-color-added-staged);
+    }
+
     &.git-line-removed:before,
     &.git-previous-line-removed:before {
       position: absolute;
@@ -20,6 +28,11 @@ lumine-text-editor {
       border-width: 4px;
       margin-top: -4px;
       pointer-events: none;
+    }
+
+    &.git-line-removed.git-line-staged:before,
+    &.git-previous-line-removed.git-line-staged:before {
+      border-left-color: var(--syntax-color-removed-staged);
     }
 
     &.git-line-removed:before {
@@ -59,11 +72,24 @@ lumine-text-editor {
       color: var(--syntax-color-added);
     }
 
+    &.git-line-modified.git-line-staged:before {
+      color: var(--syntax-color-modified-staged);
+    }
+
+    &.git-line-added.git-line-staged:before {
+      color: var(--syntax-color-added-staged);
+    }
+
     &.git-line-removed:before,
     &.git-previous-line-removed:before {
       border: none; /* reset triangle */
       content: "\f0ca";
       color: var(--syntax-color-removed);
+    }
+
+    &.git-line-removed.git-line-staged:before,
+    &.git-previous-line-removed.git-line-staged:before {
+      color: var(--syntax-color-removed-staged);
     }
     &.git-line-removed:before {
       top: 1em;

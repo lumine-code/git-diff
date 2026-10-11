@@ -12,4 +12,16 @@
   &.removed {
     background-color: var(--syntax-color-removed);
   }
+
+  &.added.staged {
+    background-color: var(--syntax-color-added-staged);
+  }
+
+  &.modified.staged {
+    background-color: var(--syntax-color-modified-staged);
+  }
+
+  &.removed.staged {
+    background-color: var(--syntax-color-removed-staged);
+  }
 }

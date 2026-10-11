@@ -120,8 +120,8 @@ describe("GitDiff package", () => {
       await conditionPromise(() => editor.getMarkers().length > 0);
       afterFirstEdit = repository.getLineDiffsAsync.calls.count();
 
-      // An index-only event — staging, unstaging — reuses the same head oid
-      // and buffer, so no worker round trip happens.
+      // A repeated snapshot reuses this file's HEAD/index identities and
+      // buffer, so no worker round trip happens.
       repository.emitter.emit("did-change-status-snapshot", repository.getStatusSnapshot());
       expect(repository.getLineDiffsAsync.calls.count()).toBe(afterFirstEdit);
 
@@ -406,6 +406,32 @@ describe("GitDiff package", () => {
       const update = view.updateDiffs();
       await conditionPromise(() => resolveDiffs != null);
       headOid = "new-head";
+      resolveDiffs([{ oldStart: 1, newStart: 1, oldLines: 1, newLines: 1 }]);
+      await update;
+
+      expect(view.diffs).toBe(appliedDiffs);
+      expect(view.markers.size).toBe(0);
+    });
+
+    it("drops a result when its index blob changed before the next frame", async () => {
+      const mainModule = lumine.packages.getActivePackage("git-diff").mainModule;
+      const view = mainModule.markerLayer.views.get(editor);
+      await conditionPromise(() => view.diffs != null && view.diffAbortController == null);
+
+      const appliedDiffs = view.diffs;
+      let indexBlobOid = "old-index";
+      let resolveDiffs;
+      spyOn(view.repository, "getStatusEntry").and.callFake(() => ({ indexBlobOid }));
+      spyOn(view.repository, "getLineDiffsAsync").and.returnValue(
+        new Promise((resolve) => {
+          resolveDiffs = resolve;
+        }),
+      );
+
+      view.bufferChangedSinceDiff = true;
+      const update = view.updateDiffs();
+      await conditionPromise(() => resolveDiffs != null);
+      indexBlobOid = "new-index";
       resolveDiffs([{ oldStart: 1, newStart: 1, oldLines: 1, newLines: 1 }]);
       await update;
 

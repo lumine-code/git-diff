@@ -34,11 +34,11 @@ describe("git-diff:toggle-diff-list", () => {
 
   it("shows a list of all diff hunks", () => {
     diffListView = document.querySelector(".diff-list-view ol");
-    expect(diffListView.textContent).toBe("while (items.length > 0) {a-9,1 +9,1");
+    expect(diffListView.textContent).toBe("while (items.length > 0) {aUnstaged · -9,1 +9,1");
     const list = diffListView.closest("lumine-input-dialog").getModel();
     const [diff] = list.getItems();
     expect(list.getItemId(diff)).toBe(
-      JSON.stringify([diff.oldStart, diff.oldLines, diff.newStart, diff.newLines]),
+      JSON.stringify([diff.stage, diff.oldStart, diff.oldLines, diff.newStart, diff.newLines]),
     );
     expect(list.getActions()).toContain(
       jasmine.objectContaining({

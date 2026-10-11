@@ -7,6 +7,7 @@ Fork of [pulsar-edit/pulsar](https://github.com/pulsar-edit/pulsar) (`packages/g
 ## Features
 
 - **Gutter markers**: marks added and edited lines with colored line numbers, and deleted lines with a compact horizontal marker.
+- **Staging status**: distinguishes staged and unstaged changes with separate shades of each change color.
 - **Icon or marker style**: shows colored icons instead of the default line-number and deletion markers.
 - **Diff navigation**: moves the cursor to the next or previous diff in the editor.
 - **Diff list**: opens a searchable list of all diffs in the current file.
@@ -25,17 +26,26 @@ Commands available in `lumine-workspace`:
 - `git-diff:move-to-previous-diff`: move the cursor to the previous diff,
 - `git-diff:toggle-diff-list`: toggle the list of diffs in the current file.
 
+## Usage
+
+Unstaged markers show edits made since the staged version of the file, including unsaved edits. Staged markers use muted colors with readable contrast in One Night and One Day. When an unstaged change overlaps or touches a staged block, the unstaged marker takes priority and the staged block's marker is hidden. Navigation and the diff list follow the visible markers, and each list entry identifies its staging status.
+
 ## Services
 
 - `marker.layer`: provided to draw the changed lines on the editor's overview maps (scrollbar, minimap).
 
 ## Customization
 
-Give added-line numbers a custom color by adding CSS to your `styles.css`:
+Set separate colors for unstaged and staged additions by adding CSS to your `styles.css`:
 
 ```css
-lumine-text-editor .gutter .line-number.git-line-added {
-  color: #98c379;
+:root {
+  --syntax-color-added: #98c379;
+  --syntax-color-added-staged: color-mix(
+    in srgb,
+    var(--syntax-color-added) 40%,
+    var(--syntax-text-color)
+  );
 }
 ```
 
