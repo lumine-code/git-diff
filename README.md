@@ -14,6 +14,8 @@ Fork of [pulsar-edit/pulsar](https://github.com/pulsar-edit/pulsar) (`packages/g
 - **Wrap-around**: optionally wraps around to the first or last diff when navigating.
 - **Scrollbar markers**: shows the changed lines on the scrollbar and minimap via the marker hub.
 
+![See changed lines marked beside their line numbers.](.github/demo.png)
+
 ## Installation
 
 To install `git-diff` search for it in the Install pane of the Lumine settings, or run the command `lumine --install lumine-code/git-diff`.
