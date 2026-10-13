@@ -19,11 +19,15 @@
       "submenu": [
         {
           "label": "Go to Next Diff",
-          "command": "git-diff:move-to-next-diff"
+          "command": "git-diff:move-to-next-diff",
+          "group": "changes",
+          "order": 10
         },
         {
           "label": "Go to Previous Diff",
-          "command": "git-diff:move-to-previous-diff"
+          "command": "git-diff:move-to-previous-diff",
+          "group": "changes",
+          "order": 20
         }
       ]
     },
