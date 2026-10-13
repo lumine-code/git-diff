@@ -1,6 +1,33 @@
 {
   "menu": [
     {
+      "label": "View",
+      "submenu": [
+        {
+          "label": "Open View",
+          "submenu": [
+            {
+              "label": "Git Diff List",
+              "command": "git-diff:toggle-diff-list"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "label": "Search",
+      "submenu": [
+        {
+          "label": "Go to Next Diff",
+          "command": "git-diff:move-to-next-diff"
+        },
+        {
+          "label": "Go to Previous Diff",
+          "command": "git-diff:move-to-previous-diff"
+        }
+      ]
+    },
+    {
       "label": "Packages",
       "submenu": [
         {
