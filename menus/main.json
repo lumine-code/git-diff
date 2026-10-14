@@ -38,7 +38,7 @@
           "label": "View Changes",
           "command": "git-diff:toggle-diff-list",
           "group": "changes",
-          "order": 20
+          "order": 15
         }
       ]
     },
