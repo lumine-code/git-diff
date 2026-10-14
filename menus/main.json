@@ -1,20 +1,6 @@
 {
   "menu": [
     {
-      "label": "View",
-      "submenu": [
-        {
-          "label": "Open View",
-          "submenu": [
-            {
-              "label": "Git Diff List",
-              "command": "git-diff:toggle-diff-list"
-            }
-          ]
-        }
-      ]
-    },
-    {
       "label": "Go",
       "submenu": [
         {
@@ -35,7 +21,7 @@
       "label": "Git",
       "submenu": [
         {
-          "label": "View Changes",
+          "label": "List File Changes…",
           "command": "git-diff:toggle-diff-list",
           "group": "changes",
           "order": 15
