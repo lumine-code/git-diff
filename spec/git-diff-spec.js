@@ -261,6 +261,28 @@ describe("GitDiff package", () => {
   });
 
   describe("when the project paths change", () => {
+    it("does not diff a buffer excluded by an ignored parent directory", async () => {
+      const ignoredPath = path.join(projectPath, "cache", "generated.txt");
+      fs.writeFileSync(path.join(projectPath, ".gitignore"), "cache/\n");
+      fs.mkdirSync(path.join(projectPath, "cache"));
+      fs.writeFileSync(ignoredPath, "generated\n");
+      const repository = await lumine.repositories.resolveForPath(ignoredPath);
+      await repository.refreshStatusSnapshot();
+      expect(repository.getStatusEntry(ignoredPath)).toBeNull();
+      expect(repository.isPathIgnoredCached(ignoredPath)).toBe(true);
+      const ignoredEditor = await lumine.workspace.open(ignoredPath);
+      const view = lumine.packages
+        .getActivePackage("git-diff")
+        .mainModule.markerLayer.views.get(ignoredEditor);
+      await conditionPromise(() => view.repository === repository && view.diffs != null);
+      spyOn(repository, "getLineDiffsAsync").and.callThrough();
+      ignoredEditor.insertText("changed");
+      await flushMicrotasks();
+      expect(repository.getLineDiffsAsync).not.toHaveBeenCalled();
+      expect(view.diffs).toEqual([]);
+      expect(ignoredEditor.getMarkers().length).toBe(0);
+    });
+
     it("doesn't try to use the destroyed git repository", async () => {
       editor.deleteLine();
       lumine.project.setPaths([temp.mkdirSync("no-repository")]);
@@ -409,7 +431,9 @@ describe("GitDiff package", () => {
       const appliedDiffs = view.diffs;
       let headOid = "old-head";
       let resolveDiffs;
+      const snapshot = view.repository.getStatusSnapshot();
       spyOn(view.repository, "getStatusSnapshot").and.callFake(() => ({
+        ...snapshot,
         head: { oid: headOid },
       }));
       spyOn(view.repository, "getLineDiffsAsync").and.returnValue(
