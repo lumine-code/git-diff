@@ -1,4 +1,5 @@
 describe("git-diff pickers in editor windows", () => {
+  let fixture;
   beforeEach(async () => {
     jasmine.useRealClock();
     jasmine.attachToDOM(lumine.workspace.getElement());
@@ -7,13 +8,19 @@ describe("git-diff pickers in editor windows", () => {
   afterEach(async () => {
     await lumine.packages.deactivatePackage("git-diff");
     await lumine.workspace.discardEditorWindows();
+    await fixture?.cleanup();
+    fixture = null;
   });
   it("keeps simultaneous queries in independent native hosts", async () => {
     const workspace = lumine.workspace;
-    const first = await workspace.open();
+    fixture = await require("./changed-editor-fixture")();
+    const first = fixture.editor;
     const extra = await workspace.openEditorWindow({ show: false });
-    const second = workspace.buildTextEditor();
+    const second = workspace.buildTextEditor({ buffer: first.getBuffer() });
     extra.getEditorContainer().getActivePane().activateItem(second, { activatePane: true });
+    await conditionPromise(() =>
+      lumine.commands.canDispatch(second.getElement(), "git-diff:toggle-diff-list"),
+    );
     await lumine.commands.dispatch(first.getElement(), "git-diff:toggle-diff-list");
     await lumine.commands.dispatch(second.getElement(), "git-diff:toggle-diff-list");
     const local = workspace

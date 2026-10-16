@@ -27,7 +27,7 @@ describe("git-diff menu commands in captured presentation contexts", () => {
     first = second = firstPane = notebook = captured = null;
   });
 
-  it("keeps the invoking window document when the global active editor is elsewhere", async () => {
+  it("does not offer a diff list for an unsaved document in another window", async () => {
     const extra = await lumine.workspace.openEditorWindow({ show: false });
     extra.getEditorContainer().getActivePane().activateItem(second, { activatePane: true });
     firstPane.activate();
@@ -38,10 +38,11 @@ describe("git-diff menu commands in captured presentation contexts", () => {
 
     await lumine.commands.dispatch(button, "git-diff:toggle-diff-list");
 
-    expect(captured).toHaveBeenCalledOnceWith(second);
+    expect(lumine.commands.canDispatch(button, "git-diff:toggle-diff-list")).toBe(false);
+    expect(captured).not.toHaveBeenCalled();
   });
 
-  it("uses a captured notebook cell from a non-editor command target", async () => {
+  it("does not borrow unrelated file diffs for a virtual notebook cell", async () => {
     const element = document.createElement("div");
     const button = document.createElement("button");
     element.appendChild(button);
@@ -61,7 +62,8 @@ describe("git-diff menu commands in captured presentation contexts", () => {
 
     await lumine.commands.dispatch(button, "git-diff:toggle-diff-list");
 
-    expect(captured).toHaveBeenCalledOnceWith(second);
+    expect(lumine.commands.canDispatch(button, "git-diff:toggle-diff-list")).toBe(false);
+    expect(captured).not.toHaveBeenCalled();
   });
 
   it("does not select a shared main editor when the invoking presentation has no document", async () => {

@@ -1,5 +1,5 @@
 describe("Git Diff picker pending ownership", () => {
-  let view, editor, diff;
+  let view, editor, diff, fixture;
 
   const deferred = () => {
     let resolve, reject;
@@ -20,7 +20,11 @@ describe("Git Diff picker pending ownership", () => {
     view = new DiffListView(() => [diff]);
   });
 
-  afterEach(async () => view.destroy());
+  afterEach(async () => {
+    await view.destroy();
+    await fixture?.cleanup();
+    fixture = null;
+  });
 
   it("settles an item update after destruction without showing its dead host", async () => {
     const update = deferred();
@@ -131,6 +135,7 @@ describe("Git Diff picker pending ownership", () => {
   });
 
   it("destroys the actual command's pending picker when the package deactivates", async () => {
+    fixture = await require("./changed-editor-fixture")();
     const update = deferred();
     const addList = lumine.workspace.addSelectList.bind(lumine.workspace);
     let host, commandResult;
@@ -159,5 +164,23 @@ describe("Git Diff picker pending ownership", () => {
     expect(host.isDestroyed()).toBe(true);
     expect(host.isVisible()).toBe(false);
     await host.destroy();
+  });
+
+  it("allows closing the actual command's visible picker after its editor disappears", async () => {
+    fixture = await require("./changed-editor-fixture")();
+    const addList = lumine.workspace.addSelectList.bind(lumine.workspace);
+    let host;
+    spyOn(lumine.workspace, "addSelectList").and.callFake((...args) => {
+      host = addList(...args);
+      return host;
+    });
+    await lumine.commands.dispatch(fixture.editor.getElement(), "git-diff:toggle-diff-list");
+    expect(host.isVisible()).toBe(true);
+    fixture.editor.destroy();
+    editor.destroy();
+    const target = lumine.workspace.getElement();
+    expect(lumine.commands.canDispatch(target, "git-diff:toggle-diff-list")).toBe(true);
+    await lumine.commands.dispatch(target, "git-diff:toggle-diff-list");
+    expect(host.isVisible()).toBe(false);
   });
 });

@@ -92,6 +92,11 @@ describe("GitDiff package", () => {
   }
 
   describe("when the editor has no changes", () => {
+    it("does not advertise hunk navigation without any hunks", async () => {
+      await conditionPromise(() => screenUpdates > 0);
+      expect(lumine.commands.canDispatch(editorElement, "git-diff:move-to-next-diff")).toBe(false);
+      expect(lumine.commands.canDispatch(editorElement, "git-diff:toggle-diff-list")).toBe(false);
+    });
     it("doesn't mark the editor", async () => {
       await conditionPromise(() => screenUpdates > 0);
       expect(editor.getMarkers().length).toBe(0);
@@ -138,6 +143,14 @@ describe("GitDiff package", () => {
   });
 
   describe("when the editor has modified lines", () => {
+    it("enables hunk navigation when actual buffer differences arrive", async () => {
+      editor.insertText("changed ");
+      advanceClock(editor.getBuffer().stoppedChangingDelay);
+      await conditionPromise(() =>
+        lumine.commands.canDispatch(editorElement, "git-diff:move-to-next-diff"),
+      );
+      expect(lumine.commands.canDispatch(editorElement, "git-diff:toggle-diff-list")).toBe(true);
+    });
     it("highlights the modified lines", async () => {
       expect(editorElement.querySelectorAll(".git-line-modified").length).toBe(0);
       editor.insertText("a");
@@ -498,7 +511,7 @@ describe("GitDiff package", () => {
 
     // A view exists for every editor, but its diffs stay null outside a
     // repository — the guard has to read the diffs, not the view.
-    it("warns instead of throwing for an editor outside any repository", async () => {
+    it("disables navigation for an editor outside any repository", async () => {
       const outsideEditor = await lumine.workspace.open();
       const outsideElement = lumine.views.getView(outsideEditor);
       spyOn(lumine.notifications, "addWarning");
@@ -506,7 +519,8 @@ describe("GitDiff package", () => {
       expect(() =>
         lumine.commands.dispatch(outsideElement, "git-diff:move-to-next-diff"),
       ).not.toThrow();
-      expect(lumine.notifications.addWarning).toHaveBeenCalled();
+      expect(lumine.commands.canDispatch(outsideElement, "git-diff:move-to-next-diff")).toBe(false);
+      expect(lumine.notifications.addWarning).not.toHaveBeenCalled();
 
       outsideEditor.destroy();
     });
