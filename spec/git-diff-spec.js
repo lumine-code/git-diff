@@ -357,7 +357,7 @@ describe("GitDiff package", () => {
       expect(view.diffAbortController).toBeNull();
     });
 
-    it("aborts immediately when the buffer changes, before the debounce", async () => {
+    it("aborts immediately when the buffer changes and starts the replacement promptly", async () => {
       const mainModule = lumine.packages.getActivePackage("git-diff").mainModule;
       const view = mainModule.markerLayer.views.get(editor);
       await conditionPromise(() => view.buffer != null);
@@ -378,11 +378,14 @@ describe("GitDiff package", () => {
       view.bufferChangedSinceDiff = true;
       const update = view.updateDiffs();
       await conditionPromise(() => request != null);
+      const staleRequest = request;
       editor.insertText("a");
 
-      expect(request.signal.aborted).toBe(true);
+      expect(staleRequest.signal.aborted).toBe(true);
       await update;
-      expect(view.bufferChangedSinceDiff).toBe(true);
+      expect(request).not.toBe(staleRequest);
+      expect(request.signal.aborted).toBe(false);
+      request.resolve([]);
     });
 
     it("drops a result when its HEAD input changed before the next frame", async () => {
