@@ -131,6 +131,51 @@ describe("Git Diff picker pending ownership", () => {
     }
   });
 
+  it("refreshes owned hunks through flow suspension and releases the source on dismissal", async () => {
+    jasmine.attachToDOM(lumine.workspace.getElement());
+    let updated;
+    const disposed = jasmine.createSpy("dispose diff updates");
+    view.observeDiffs = (owner, callback) => {
+      expect(owner).toBe(editor);
+      updated = callback;
+      return { dispose: disposed };
+    };
+    await view.toggle(editor);
+    const list = view.selectList;
+    await list.runAction("select-list:toggle-keep-open");
+    await list.setQuery("changed");
+    const selectedId = list.getSelectedItemId();
+    await view.selectListHost.showActions();
+    expect(disposed).not.toHaveBeenCalled();
+    editor.setText("first\nchanged again\nlast\n");
+    updated();
+    await conditionPromise(() => list.getItems()[0].lineText === "changed again");
+    lumine.workspace.popModal();
+    expect(view.selectListHost.isVisible()).toBe(true);
+    expect(list.getQuery()).toBe("changed");
+    expect(list.getSelectedItemId()).toBe(selectedId);
+    await list.confirmSelection();
+    expect(editor.getCursorBufferPosition()).toEqual([1, 0]);
+    expect(view.selectListHost.isVisible()).toBe(true);
+
+    view.selectListHost.cancel();
+    expect(disposed).toHaveBeenCalledTimes(1);
+    expect(view.editor).toBeNull();
+    const publish = spyOn(list, "setItems").and.callThrough();
+    updated();
+    await Promise.resolve();
+    expect(publish).not.toHaveBeenCalled();
+  });
+
+  it("cancels a visible retained picker when its owning editor is destroyed", async () => {
+    jasmine.attachToDOM(lumine.workspace.getElement());
+    await view.toggle(editor);
+    await view.selectList.runAction("select-list:toggle-keep-open");
+    editor.destroy();
+    expect(view.selectListHost.isVisible()).toBe(false);
+    expect(view.editor).toBeNull();
+  });
+
   it("ignores a failed item update belonging to a destroyed picker", async () => {
     const update = deferred();
     spyOn(view.selectList, "setItems").and.returnValue(update.promise);
@@ -183,7 +228,7 @@ describe("Git Diff picker pending ownership", () => {
     await host.destroy();
   });
 
-  it("allows closing the actual command's visible picker after its editor disappears", async () => {
+  it("closes the actual command's picker and disables reopening after its editor disappears", async () => {
     fixture = await require("./changed-editor-fixture")();
     const addList = lumine.workspace.addSelectList.bind(lumine.workspace);
     let host;
@@ -196,8 +241,37 @@ describe("Git Diff picker pending ownership", () => {
     fixture.editor.destroy();
     editor.destroy();
     const target = lumine.workspace.getElement();
-    expect(lumine.commands.canDispatch(target, "git-diff:toggle-diff-list")).toBe(true);
-    await lumine.commands.dispatch(target, "git-diff:toggle-diff-list");
     expect(host.isVisible()).toBe(false);
+    expect(lumine.commands.canDispatch(target, "git-diff:toggle-diff-list")).toBe(false);
+    expect(lumine.commands.dispatch(target, "git-diff:toggle-diff-list")).toBeNull();
+  });
+
+  it("allows closing a live owner's visible picker without active editor resolution", async () => {
+    fixture = await require("./changed-editor-fixture")();
+    const addList = lumine.workspace.addSelectList.bind(lumine.workspace);
+    let host;
+    spyOn(lumine.workspace, "addSelectList").and.callFake((...args) => {
+      host = addList(...args);
+      return host;
+    });
+    await lumine.commands.dispatch(fixture.editor.getElement(), "git-diff:toggle-diff-list");
+    const container = lumine.workspace.getMainWindow().getEditorContainer();
+    const activeItem = spyOn(container.getActivePane(), "getActiveItem").and.returnValue(null);
+    const embedded = spyOn(container, "getActiveEmbeddedTextEditor").and.returnValue(null);
+    try {
+      const target = lumine.workspace.getElement();
+      expect(lumine.workspace.resolveCommandContext(target).editor).toBeFalsy();
+      expect(lumine.commands.canDispatch(target, "git-diff:move-to-next-diff")).toBe(false);
+      expect(fixture.editor.isDestroyed()).toBe(false);
+      expect(host.isVisible()).toBe(true);
+      expect(lumine.commands.canDispatch(target, "git-diff:toggle-diff-list")).toBe(true);
+
+      await lumine.commands.dispatch(target, "git-diff:toggle-diff-list");
+
+      expect(host.isVisible()).toBe(false);
+    } finally {
+      activeItem.and.callThrough();
+      embedded.and.callThrough();
+    }
   });
 });
