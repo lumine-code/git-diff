@@ -32,6 +32,8 @@ Commands available in `lumine-workspace`:
 
 Unstaged markers show edits made since the staged version of the file, including unsaved edits. Staged markers use muted colors with readable contrast in One Night and One Day. When an unstaged change overlaps or touches a staged block, the unstaged marker takes priority and the staged block's marker is hidden. Navigation and the diff list follow the visible markers, and each list entry identifies its staging status.
 
+Comparisons with a missing Git baseline are omitted, so new files do not receive whole-file addition markers when staged or marked with intent to add. Edits made after staging a new file still show their individual unstaged changes.
+
 ## Services
 
 - `marker.layer`: provided to draw the changed lines on the editor's overview maps (scrollbar, minimap).

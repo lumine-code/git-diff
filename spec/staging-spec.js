@@ -82,6 +82,18 @@ describe("Git Diff staged and unstaged changes", () => {
     }
   }
 
+  function expectNoMarkers() {
+    expect(view.markers.size).toBe(0);
+    expect(
+      element.querySelectorAll(
+        ".git-line-added,.git-line-modified,.git-line-removed,.git-previous-line-removed",
+      ).length,
+    ).toBe(0);
+    const provider = lumine.packages.getActivePackage("git-diff").mainModule.provideMarkerLayer();
+    expect(provider.getItems({ editor, cache: new Map([["diffs", view.diffs]]) })).toEqual([]);
+    expect(lumine.commands.canDispatch(element, "git-diff:toggle-diff-list")).toBe(false);
+  }
+
   beforeEach(async () => {
     cleanup = captureFixture();
     projectPath = temp.mkdirSync("git-diff-staging-");
@@ -237,25 +249,162 @@ describe("Git Diff staged and unstaged changes", () => {
     });
   }
 
-  it("shows a newly staged file as an addition against an empty HEAD baseline", async () => {
+  it("keeps a new file free of markers before staging, after staging, and after unstaging", async () => {
     const newPath = path.join(projectPath, "new.txt");
     await fs.promises.writeFile(newPath, "first\nsecond\n");
+    await repository.refreshStatusSnapshot();
+    editor = await lumine.workspace.open(newPath);
+    element = lumine.views.getView(editor);
+    view = lumine.packages.getActivePackage("git-diff").mainModule.markerLayer.views.get(editor);
+    await conditionPromise(() => view.repository && view.diffs != null);
+    await waitForDiffs([]);
+    expectNoMarkers();
+
+    await git(["add", "--", "new.txt"]);
+    await repository.refreshStatusSnapshot();
+    await view.updateDiffs();
+    await waitForDiffs([]);
+    expectNoMarkers();
+
+    await git(["reset", "HEAD", "--", "new.txt"]);
+    await repository.refreshStatusSnapshot();
+    await view.updateDiffs();
+    await waitForDiffs([]);
+    expectNoMarkers();
+  });
+
+  it("omits whole-file additions before the repository has its first commit", async () => {
+    await git(["checkout", "--orphan", "unborn"]);
+    await repository.refreshStatusSnapshot();
+    expect(repository.getStatusSnapshot().head.unborn).toBe(true);
+    await view.updateDiffs();
+    await waitForDiffs([]);
+    expectNoMarkers();
+
+    const lines = [...baseline];
+    lines[4] = "first unstaged edit";
+    await setLines(lines, { save: true });
+    await waitForDiffs([{ stage: "unstaged", newStart: 5, oldLines: 1, newLines: 1 }]);
+    await stage();
+    await waitForDiffs([]);
+    await conditionPromise(() => !element.querySelector(".git-line-modified"));
+    expectNoMarkers();
+
+    await git([
+      "-c",
+      "user.name=Git Diff Fixture",
+      "-c",
+      "user.email=git-diff-fixture@example.invalid",
+      "commit",
+      "-m",
+      "First orphan commit",
+    ]);
+    await repository.refreshStatusSnapshot();
+    lines[4] = "edit after the first commit";
+    await setLines(lines, { save: true });
+    await stage();
+    await waitForDiffs([{ stage: "staged", newStart: 5, oldLines: 1, newLines: 1 }]);
+  });
+
+  it("omits whole-file additions for intent-to-add entries with no baseline blob", async () => {
+    const newPath = path.join(projectPath, "intent.txt");
+    await fs.promises.writeFile(newPath, "first\nsecond\n");
+    await git(["add", "-N", "--", "intent.txt"]);
+    await repository.refreshStatusSnapshot();
+    editor = await lumine.workspace.open(newPath);
+    element = lumine.views.getView(editor);
+    view = lumine.packages.getActivePackage("git-diff").mainModule.markerLayer.views.get(editor);
+    await conditionPromise(() => view.repository && view.diffs != null);
+    expect(repository.getStatusEntry(newPath).indexBlobOid).toBeNull();
+    await waitForDiffs([]);
+    expectNoMarkers();
+
+    editor.insertText("unsaved ");
+    await view.updateDiffs();
+    await waitForDiffs([]);
+    expectNoMarkers();
+  });
+
+  it("does not mark a new buffer whose assigned path has never been saved", async () => {
+    const newPath = path.join(projectPath, "never-saved.txt");
+    editor = await lumine.workspace.open(newPath);
+    element = lumine.views.getView(editor);
+    view = lumine.packages.getActivePackage("git-diff").mainModule.markerLayer.views.get(editor);
+    await conditionPromise(() => view.repository && view.diffs != null);
+    expect(repository.getStatusEntry(newPath)).toBeNull();
+    editor.insertText("first\nsecond\n");
+    await view.updateDiffs();
+    await waitForDiffs([]);
+    expectNoMarkers();
+
+    await editor.save();
+    await git(["add", "--", "never-saved.txt"]);
+    await repository.refreshStatusSnapshot();
+    await view.updateDiffs();
+    await waitForDiffs([]);
+    expectNoMarkers();
+
+    editor.setText("first\nchanged second\n");
+    await view.updateDiffs();
+    await waitForDiffs([{ stage: "unstaged", newStart: 2, oldLines: 1, newLines: 1 }]);
+  });
+
+  it("still shows individual unstaged edits made after staging a new file", async () => {
+    const newPath = path.join(projectPath, "new.txt");
+    await fs.promises.writeFile(newPath, text(baseline));
     await git(["add", "--", "new.txt"]);
     await repository.refreshStatusSnapshot();
     editor = await lumine.workspace.open(newPath);
     element = lumine.views.getView(editor);
     view = lumine.packages.getActivePackage("git-diff").mainModule.markerLayer.views.get(editor);
     await conditionPromise(() => view.repository && view.diffs != null);
-    await waitForDiffs([{ stage: "staged", newStart: 1, oldLines: 0, newLines: 2 }]);
-    await conditionPromise(() => element.querySelector(".git-line-added.git-line-staged"));
+    const lines = [...baseline];
+    lines[4] = "unsaved replacement";
+    await setLines(lines);
+    await waitForDiffs([{ stage: "unstaged", newStart: 5, oldLines: 1, newLines: 1 }]);
+    await conditionPromise(() => element.querySelector(".git-line-modified"));
+    expect(element.querySelector(".git-line-staged")).toBeNull();
+
+    await editor.save();
+    await git(["add", "--", "new.txt"]);
+    await repository.refreshStatusSnapshot();
+    await waitForDiffs([]);
+    await conditionPromise(() => !element.querySelector(".git-line-modified"));
+    expectNoMarkers();
   });
 
-  it("shows staged additions before the repository has its first commit", async () => {
-    await git(["checkout", "--orphan", "unborn"]);
+  it("keeps additions to an empty committed file visible", async () => {
+    editor.setText("");
+    await editor.save();
+    await stage();
+    await git([
+      "-c",
+      "user.name=Git Diff Fixture",
+      "-c",
+      "user.email=git-diff-fixture@example.invalid",
+      "commit",
+      "-m",
+      "Empty fixture",
+    ]);
     await repository.refreshStatusSnapshot();
-    expect(repository.getStatusSnapshot().head.unborn).toBe(true);
-    await waitForDiffs([{ stage: "staged", newStart: 1, oldLines: 0, newLines: baseline.length }]);
-    await conditionPromise(() => element.querySelector(".git-line-added.git-line-staged"));
+    await setLines(["new line"], { save: true });
+    await stage();
+    await waitForDiffs([{ stage: "staged", newStart: 1, oldLines: 0, newLines: 1 }]);
+  });
+
+  it("does not mark a surviving buffer as a whole-file addition after staging its deletion", async () => {
+    await git(["rm", "--", "sample.txt"]);
+    await repository.refreshStatusSnapshot();
+    expect(repository.getStatusEntry(editor.getPath()).indexBlobOid).toBeNull();
+    expect(editor.getText()).toBe(text(baseline));
+    await view.updateDiffs();
+    await waitForDiffs([]);
+    expectNoMarkers();
+
+    editor.insertText("unsaved after deletion ");
+    await view.updateDiffs();
+    await waitForDiffs([]);
+    expectNoMarkers();
   });
 
   it("compares a staged rename with the original path in HEAD", async () => {
