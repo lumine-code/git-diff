@@ -114,6 +114,23 @@ describe("Git Diff picker pending ownership", () => {
     expect(diff.lineText).toBeUndefined();
   });
 
+  it("keeps repeated hunk navigation attached to the initiating editor", async () => {
+    jasmine.attachToDOM(lumine.workspace.getElement());
+    const second = { ...diff, oldStart: 3, newStart: 3 };
+    view.getDiffs = () => [diff, second];
+    const other = await lumine.workspace.open();
+    await view.toggle(editor);
+    await view.selectList.runAction("select-list:toggle-keep-open");
+
+    for (let index = 0; index < 2; index++) {
+      await view.selectList.selectIndex(index);
+      await view.selectList.confirmSelection();
+      expect(editor.getCursorBufferPosition()).toEqual([index + 1, 0]);
+      expect(other.getCursorBufferPosition()).toEqual([0, 0]);
+      expect(view.selectListHost.isVisible()).toBe(true);
+    }
+  });
+
   it("ignores a failed item update belonging to a destroyed picker", async () => {
     const update = deferred();
     spyOn(view.selectList, "setItems").and.returnValue(update.promise);
