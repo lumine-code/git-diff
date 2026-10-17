@@ -8,6 +8,7 @@ Fork of [pulsar-edit/pulsar](https://github.com/pulsar-edit/pulsar) (`packages/g
 
 - **Gutter markers**: marks added and edited lines with colored line numbers, and deleted lines with a compact horizontal marker.
 - **Staging status**: distinguishes staged and unstaged changes with separate shades of each change color.
+- **Responsive updates**: shares calculations between panes, combines rapid edits when comparisons are costly, and reuses unchanged markers.
 - **Icon or marker style**: shows colored icons instead of the default line-number and deletion markers.
 - **Diff navigation**: moves the cursor to the next or previous diff in the editor.
 - **Diff list**: opens a searchable list of all diffs in the current file.

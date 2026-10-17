@@ -80,4 +80,53 @@ describe("git-diff updates during editing", () => {
     await flushMicrotasks();
     expect(repository.getLineDiffsAsync).not.toHaveBeenCalled();
   });
+
+  it("shares one comparison across four panes displaying the same buffer", async () => {
+    const pane = lumine.workspace.paneForItem(editor);
+    const panes = Array.from({ length: 3 }, () => pane.splitRight({ items: [editor.copy()] }));
+    const main = lumine.packages.getActivePackage("git-diff").mainModule;
+    const views = () =>
+      [...main.markerLayer.views.values()].filter(
+        (v) => v.editor.getBuffer() === editor.getBuffer(),
+      );
+    await conditionPromise(
+      () => views().length === 4 && views().every((v) => v.lastDiffInputs != null),
+    );
+    spyOn(view.repository, "getLineDiffsAsync").and.callThrough();
+    editor.insertText("shared edit ");
+    await conditionPromise(() =>
+      views().every((v) => v.diffs?.length > 0 && !v.diffAbortController),
+    );
+    expect(view.repository.getLineDiffsAsync).toHaveBeenCalledTimes(1);
+    for (const other of panes) {
+      other.getActiveItem().destroy();
+      other.destroy();
+    }
+  });
+
+  it("reuses markers when an edit does not change hunk ranges or kinds", async () => {
+    editor.insertText("first ");
+    await conditionPromise(() => view.diffs.length > 0 && !view.diffAbortController);
+    const markers = [...view.markers.values()];
+    spyOn(view, "markRange").and.callThrough();
+    editor.insertText("second ");
+    await flushMicrotasks();
+    await conditionPromise(() => !view.diffAbortController);
+    expect([...view.markers.values()]).toEqual(markers);
+    expect(view.markRange).not.toHaveBeenCalled();
+    expect(markers.every((marker) => !marker.isDestroyed())).toBe(true);
+  });
+
+  it("reuses a hunk marker that followed an insertion above it", async () => {
+    editor.setCursorBufferPosition([6, 0]);
+    editor.insertText("changed ");
+    await conditionPromise(() => view.diffs.length === 1 && !view.diffAbortController);
+    const marker = [...view.markers.values()][0];
+    editor.setCursorBufferPosition([0, 0]);
+    editor.insertText("inserted line\n");
+    await conditionPromise(() => view.diffs.length === 2 && !view.diffAbortController);
+    expect([...view.markers.values()]).toContain(marker);
+    expect(marker.getBufferRange().start.row).toBe(7);
+    expect(marker.isDestroyed()).toBe(false);
+  });
 });
