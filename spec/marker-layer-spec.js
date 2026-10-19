@@ -34,7 +34,6 @@ describe("git-diff marker layer", () => {
     const layer = {
       editor: layerEditor,
       props: provider,
-      cache: new Map(),
       items: [],
       disposables: new CompositeDisposable(),
       update: jasmine.createSpy("update"),
@@ -127,7 +126,7 @@ describe("git-diff marker layer", () => {
     it("reports no markers for an unmodified file", async () => {
       const layer = await createInitializedLayer(editor);
       await refresh(layer);
-      expect(layer.cache.get("diffs")).toEqual([]);
+      expect(mainModule.markerLayer.views.get(editor).markers.size).toBe(0);
       expect(provider.getItems(layer)).toEqual([]);
     });
 
@@ -172,6 +171,78 @@ describe("git-diff marker layer", () => {
       expect(provider.getItems(layer)).toEqual([{ row: 0, end: 0, cls: "removed" }]);
     });
 
+    it("follows an existing hunk during repeated newlines while its next comparison is pending", async () => {
+      const layer = await createInitializedLayer(editor);
+      editor.setTextInBufferRange(
+        [
+          [6, 0],
+          [6, 1],
+        ],
+        "M",
+      );
+      await refresh(layer);
+      expect(provider.getItems(layer)).toEqual([{ row: 6, end: 6, cls: "modified" }]);
+      const view = mainModule.markerLayer.views.get(editor);
+      const applied = view.diffs;
+      let release;
+      const blocked = new Promise((resolve) => {
+        release = resolve;
+      });
+      let requested = false;
+      spyOn(view.repository, "getLineDiffsAsync").and.callFake(() => {
+        if (requested) return Promise.resolve([]);
+        requested = true;
+        return blocked;
+      });
+
+      try {
+        editor.getBuffer().insert([0, 0], "\n");
+        await waitFor(() => requested);
+        for (let index = 0; index < 10; index++) {
+          editor.getBuffer().insert([0, 0], "\n");
+          expect(provider.getItems(layer)).toEqual([
+            { row: 8 + index, end: 8 + index, cls: "modified" },
+          ]);
+        }
+        expect(view.diffs).toBe(applied);
+      } finally {
+        release([]);
+      }
+    });
+
+    it("preserves live marker kinds, stages and exclusive or partial-line endpoints", () => {
+      editor.setText(Array.from({ length: 20 }, (_, index) => `line ${index}`).join("\n"));
+      const layer = createLayer(editor);
+      const view = mainModule.markerLayer.views.get(editor);
+      const diffs = [
+        { newStart: 1, oldLines: 0, newLines: 2, stage: "staged" },
+        { newStart: 1, oldLines: 2, newLines: 0 },
+        { newStart: 1, oldLines: 2, newLines: 2 },
+      ];
+      const markers = [
+        editor.markBufferRange([
+          [2, 0],
+          [4, 0],
+        ]),
+        editor.markBufferPosition([6, 0]),
+        editor.markBufferRange([
+          [8, 0],
+          [9, 3],
+        ]),
+      ];
+      diffs.forEach((diff, index) => view.markers.set(diff, markers[index]));
+      try {
+        expect(provider.getItems(layer)).toEqual([
+          { row: 2, end: 3, cls: "added staged" },
+          { row: 6, end: 6, cls: "removed" },
+          { row: 8, end: 9, cls: "modified" },
+        ]);
+      } finally {
+        diffs.forEach((diff) => view.markers.delete(diff));
+        markers.forEach((marker) => marker.destroy());
+      }
+    });
+
     // Git reports "ignored" as its own state, not as "untracked", so the
     // untracked early-out never covered it. The path here also carries a glob
     // metacharacter, which `git show <rev>:<path>` used to answer with HEAD's
@@ -196,27 +267,87 @@ describe("git-diff marker layer", () => {
       await refresh(layer);
 
       expect(repository.getLineDiffsAsync).not.toHaveBeenCalled();
-      expect(layer.cache.get("diffs")).toEqual([]);
+      expect(mainModule.markerLayer.views.get(ignoredEditor).markers.size).toBe(0);
       expect(provider.getItems(layer)).toEqual([]);
     });
 
     it("returns raw hunk ranges and leaves merging to the host", () => {
       const layer = createLayer(editor);
-      layer.cache.set("diffs", [
+      const view = mainModule.markerLayer.views.get(editor);
+      const diffs = [
         { newStart: 4, oldLines: 0, newLines: 2 },
         { newStart: 1, oldLines: 0, newLines: 3 },
         { newStart: 10, oldLines: 1, newLines: 1 },
-      ]);
+      ];
+      const markers = [
+        editor.markBufferRange([
+          [3, 0],
+          [5, 0],
+        ]),
+        editor.markBufferRange([
+          [0, 0],
+          [3, 0],
+        ]),
+        editor.markBufferRange([
+          [9, 0],
+          [10, 0],
+        ]),
+      ];
+      diffs.forEach((diff, index) => view.markers.set(diff, markers[index]));
+      try {
+        expect(provider.getItems(layer)).toEqual([
+          { row: 3, end: 4, cls: "added" },
+          { row: 0, end: 2, cls: "added" },
+          { row: 9, end: 9, cls: "modified" },
+        ]);
+      } finally {
+        diffs.forEach((diff) => view.markers.delete(diff));
+        markers.forEach((marker) => marker.destroy());
+      }
+    });
 
-      expect(provider.getItems(layer)).toEqual([
-        { row: 3, end: 4, cls: "added" },
-        { row: 0, end: 2, cls: "added" },
-        { row: 9, end: 9, cls: "modified" },
-      ]);
+    it("draws no range for a retired or missing gutter marker", () => {
+      const layer = createLayer(editor);
+      const view = mainModule.markerLayer.views.get(editor);
+      const diff = { oldLines: 1, newLines: 1 };
+      const missing = { oldLines: 0, newLines: 1 };
+      const marker = editor.markBufferPosition([2, 0]);
+      view.markers.set(diff, marker);
+      view.markers.set(missing, undefined);
+      marker.destroy();
+      try {
+        expect(provider.getItems(layer)).toEqual([]);
+      } finally {
+        view.markers.delete(diff);
+        view.markers.delete(missing);
+      }
     });
   });
 
   describe("the view handover", () => {
+    it("clears its layer when the owning diff view detaches", async () => {
+      const layer = await createInitializedLayer(editor);
+      const view = mainModule.markerLayer.views.get(editor);
+      const diff = { oldLines: 1, newLines: 1 };
+      const marker = editor.markBufferRange([
+        [2, 0],
+        [3, 0],
+      ]);
+      view.markers.set(diff, marker);
+      expect(provider.getItems(layer)).toEqual([{ row: 2, end: 2, cls: "modified" }]);
+      layer.update.calls.reset();
+      try {
+        mainModule.markerLayer.detachView(editor);
+
+        expect(layer.update).toHaveBeenCalledTimes(1);
+        expect(provider.getItems(layer)).toEqual([]);
+      } finally {
+        view.markers.delete(diff);
+        marker.destroy();
+        mainModule.markerLayer.attachView(editor, view);
+      }
+    });
+
     it("forgets the editor once its layer detaches", async () => {
       const layer = await createInitializedLayer(editor);
       expect(mainModule.markerLayer.layers.has(editor)).toBe(true);

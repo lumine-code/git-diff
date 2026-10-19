@@ -24,7 +24,7 @@ describe("shared buffer diff work", () => {
         .and.callFake(
           (path, text, options) =>
             new Promise((resolve, reject) =>
-              requests.push({ path, text, ...options, resolve, reject }),
+              requests.push({ path, text, ...options, resolve, reject, startedAt: clock }),
             ),
         ),
     };
@@ -93,33 +93,50 @@ describe("shared buffer diff work", () => {
     expect(results.at(-1)).toEqual([]);
   });
 
-  it("coalesces sustained typing after an expensive computation and resumes promptly after idle", async () => {
+  it("keeps expensive comparisons progressing throughout uninterrupted typing", async () => {
     edit("first");
     const first = work.request(input);
-    clock = 100;
-    edit("second");
-    const second = work.request(input);
-    clock = 180;
+    clock = 40;
     requests[0].resolve([]);
     await first;
-    await settle();
-    expect(requests.length).toBe(1);
-    clock = 250;
-    edit("latest");
-    const latest = work.request(input);
-    expect(await second).toBeUndefined();
-    tick(199);
-    expect(requests.length).toBe(1);
-    tick(1);
-    expect(requests.length).toBe(2);
-    expect(requests[1].text).toBe("latest");
-    requests[1].resolve([]);
-    await latest;
+
+    const typing = [];
+    let completed = 1;
+    // Every gap is shorter than the adaptive interval. Keep each comparison
+    // expensive too, so a debounce cannot escape by observing a fast result.
+    for (let index = 0; index < 32; index++) {
+      tick(10);
+      edit(`typing ${index}`);
+      typing.push(work.request(input));
+      if (requests[completed] && clock - requests[completed].startedAt >= 40) {
+        requests[completed++].resolve([]);
+        await settle();
+      }
+    }
+
+    expect(requests.length).toBeGreaterThan(3);
+    expect(completed).toBeGreaterThan(3);
+    expect(buffer.getText.calls.count()).toBe(requests.length);
+    expect(requests.slice(1).every(({ text }) => text.startsWith("typing "))).toBe(true);
+    // Replacement requests must not fan out concurrent comparisons.
+    expect(requests.length - completed).toBeLessThan(2);
+    work.destroy();
+    for (const request of requests.slice(completed)) request.resolve([]);
+    await Promise.all(typing);
+  });
+
+  it("resumes immediately after an expensive comparison's interval has elapsed", async () => {
+    edit("first");
+    const first = work.request(input);
+    clock = 40;
+    requests[0].resolve([]);
+    await first;
     tick(1000);
     edit("after idle");
     const next = work.request(input);
-    expect(requests.length).toBe(3);
-    requests[2].resolve([]);
+    expect(requests.length).toBe(2);
+    expect(timers.size).toBe(0);
+    requests[1].resolve([]);
     await next;
   });
 

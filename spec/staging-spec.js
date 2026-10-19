@@ -65,10 +65,7 @@ describe("Git Diff staged and unstaged changes", () => {
 
   function expectStagedOverviewColor(kind, color) {
     const provider = lumine.packages.getActivePackage("git-diff").mainModule.provideMarkerLayer();
-    const overview = provider.getItems({
-      editor,
-      cache: new Map([["diffs", view.diffs]]),
-    });
+    const overview = provider.getItems({ editor });
     expect(overview.length).toBe(1);
     expect(overview[0].cls).toBe(`${kind} staged`);
     const marker = document.createElement("div");
@@ -90,7 +87,7 @@ describe("Git Diff staged and unstaged changes", () => {
       ).length,
     ).toBe(0);
     const provider = lumine.packages.getActivePackage("git-diff").mainModule.provideMarkerLayer();
-    expect(provider.getItems({ editor, cache: new Map([["diffs", view.diffs]]) })).toEqual([]);
+    expect(provider.getItems({ editor })).toEqual([]);
     expect(lumine.commands.canDispatch(element, "git-diff:toggle-diff-list")).toBe(false);
   }
 
