@@ -149,7 +149,9 @@ describe("Git Diff picker pending ownership", () => {
     expect(disposed).not.toHaveBeenCalled();
     editor.setText("first\nchanged again\nlast\n");
     updated();
-    await conditionPromise(() => list.getItems()[0].lineText === "changed again");
+    await conditionPromise(
+      () => !list.isFiltering() && list.getItems()[0].lineText === "changed again",
+    );
     lumine.workspace.popModal();
     expect(view.selectListHost.isVisible()).toBe(true);
     expect(list.getQuery()).toBe("changed");
