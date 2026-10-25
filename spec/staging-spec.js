@@ -5,6 +5,11 @@ const temp = require("@lumine-code/fs-temp").track();
 const captureFixture = require("./fixture");
 
 describe("Git Diff staged and unstaged changes", () => {
+  // Processing fixtures use a real grammar; None deliberately disables this package.
+  beforeEach(async () => {
+    await lumine.packages.activatePackage("language-text");
+  });
+
   let cleanup, projectPath, editor, element, view, repository, baseline;
 
   // Use real Git index mutations without blocking the renderer or rewriting

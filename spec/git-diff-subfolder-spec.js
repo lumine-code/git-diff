@@ -4,6 +4,11 @@ const temp = require("@lumine-code/fs-temp").track();
 const captureFixture = require("./fixture");
 
 describe("GitDiff when targeting nested repository", () => {
+  // Processing fixtures use a real grammar; None deliberately disables this package.
+  beforeEach(async () => {
+    await lumine.packages.activatePackage("language-text");
+  });
+
   let editor, editorElement, projectPath, cleanup;
 
   beforeEach(async () => {

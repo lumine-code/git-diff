@@ -3,6 +3,11 @@ const fs = require("@lumine-code/fs-plus");
 const temp = require("@lumine-code/fs-temp").track();
 
 describe("git-diff:toggle-diff-list", () => {
+  // Processing fixtures use a real grammar; None deliberately disables this package.
+  beforeEach(async () => {
+    await lumine.packages.activatePackage("language-text");
+  });
+
   let diffListView, editor;
 
   beforeEach(async () => {

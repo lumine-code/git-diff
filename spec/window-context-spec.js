@@ -1,4 +1,9 @@
 describe("git-diff pickers in editor windows", () => {
+  // Processing fixtures use a real grammar; None deliberately disables this package.
+  beforeEach(async () => {
+    await lumine.packages.activatePackage("language-text");
+  });
+
   let fixture;
   beforeEach(async () => {
     jasmine.useRealClock();

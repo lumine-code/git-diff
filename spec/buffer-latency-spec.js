@@ -4,6 +4,11 @@ const os = require("os");
 const captureFixture = require("./fixture");
 
 describe("git-diff updates during editing", () => {
+  // Processing fixtures use a real grammar; None deliberately disables this package.
+  beforeEach(async () => {
+    await lumine.packages.activatePackage("language-text");
+  });
+
   let editor, view, projectPath, cleanup;
 
   beforeEach(async () => {

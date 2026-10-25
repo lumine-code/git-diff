@@ -5,6 +5,11 @@ const temp = require("@lumine-code/fs-temp").track();
 const captureFixture = require("./fixture");
 
 describe("git-diff marker layer", () => {
+  // Processing fixtures use a real grammar; None deliberately disables this package.
+  beforeEach(async () => {
+    await lumine.packages.activatePackage("language-text");
+  });
+
   let workspaceElement, mainModule, provider, projectPath, editor, layers, cleanup;
 
   // The spec runner freezes setTimeout, so poll on animation frames instead.

@@ -5,6 +5,11 @@ const captureFixture = require("./fixture");
 const { spawn } = require("child_process");
 
 describe("GitDiff package", () => {
+  // Processing fixtures use a real grammar; None deliberately disables this package.
+  beforeEach(async () => {
+    await lumine.packages.activatePackage("language-text");
+  });
+
   let editor, editorElement, projectPath, screenUpdates, cleanup;
 
   beforeEach(async () => {

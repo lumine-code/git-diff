@@ -1,4 +1,9 @@
 describe("Git Diff picker pending ownership", () => {
+  // Processing fixtures use a real grammar; None deliberately disables this package.
+  beforeEach(async () => {
+    await lumine.packages.activatePackage("language-text");
+  });
+
   let view, editor, diff, fixture;
 
   const deferred = () => {
