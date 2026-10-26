@@ -12,6 +12,7 @@ describe("shared buffer diff work", () => {
     emitter = new Emitter();
     buffer = {
       text: "original",
+      getLength: () => buffer.text.length,
       getText: jasmine.createSpy("getText").and.callFake(() => buffer.text),
       isDestroyed: () => false,
       onDidChange: (fn) => emitter.on("change", fn),
@@ -70,6 +71,13 @@ describe("shared buffer diff work", () => {
     await work.request(input);
     expect(requests.length).toBe(1);
     expect(buffer.getText).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects oversized source metadata before its full getter or repository transport", async () => {
+    spyOn(buffer, "getLength").and.returnValue(512 * 1024 * 1024);
+    expect(await work.request(input)).toEqual([]);
+    expect(buffer.getText).not.toHaveBeenCalled();
+    expect(repository.getLineDiffsAsync).not.toHaveBeenCalled();
   });
 
   it("runs only the newest revision after a burst, without cancelling the running diff", async () => {

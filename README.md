@@ -35,6 +35,8 @@ Unstaged markers show edits made since the staged version of the file, including
 
 Comparisons with a missing Git baseline are omitted, so new files do not receive whole-file addition markers when staged or marked with intent to add. Edits made after staging a new file still show their individual unstaged changes.
 
+Automatic gutter comparisons apply to buffers below 2 Mi UTF-16 units. Growing past that threshold clears obsolete markers; shrinking below it resumes comparisons. The diff list shows bounded line previews with an ellipsis when a line continues beyond the preview.
+
 ## Services
 
 - `marker.layer`: provided to draw the changed lines on the editor's overview maps (scrollbar, minimap).
