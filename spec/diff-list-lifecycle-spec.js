@@ -100,6 +100,37 @@ describe("Git Diff picker pending ownership", () => {
     expect(show).not.toHaveBeenCalled();
   });
 
+  it("retires a pending open across None and permits a fresh open before the old one settles", async () => {
+    const grammar = editor.getGrammar();
+    const update = deferred();
+    const original = view.selectList.setItems.bind(view.selectList);
+    let first = true;
+    spyOn(view.selectList, "setItems").and.callFake((items) => {
+      if (!first) return original(items);
+      first = false;
+      return update.promise;
+    });
+    const pending = view.toggle(editor);
+    editor.setGrammar(lumine.grammars.nullGrammar);
+    expect(view.editor).toBeNull();
+    expect(view.selectListHost.isVisible()).toBe(false);
+    const read = spyOn(editor, "lineTextForBufferRow").and.callThrough();
+    await view.toggle(editor);
+    expect(read).not.toHaveBeenCalled();
+    editor.setGrammar(grammar);
+    await view.toggle(editor);
+    expect(view.selectListHost.isVisible()).toBe(true);
+    expect(view.editor).toBe(editor);
+    update.resolve();
+    await pending;
+    expect(view.selectListHost.isVisible()).toBe(true);
+    expect(view.editor).toBe(editor);
+    editor.setGrammar(lumine.grammars.nullGrammar);
+    expect(view.selectListHost.isVisible()).toBe(false);
+    view.openDiff(diff);
+    expect(editor.getCursorBufferPosition()).toEqual([0, 0]);
+  });
+
   it("preserves the captured editor and copied hunks through an active-tab change", async () => {
     const original = view.selectList.setItems.bind(view.selectList);
     const update = deferred();
